@@ -1,7 +1,6 @@
 import { Head, Link, useForm } from '@inertiajs/react';
 import * as React from 'react';
 
-import AppLayout from '@/layouts/app-layout';
 import { dashboard } from '@/routes';
 import attendance from '@/routes/attendance';
 
@@ -150,18 +149,7 @@ export default function Index({ attendances }: AttendanceProps) {
     };
 
     return (
-        <AppLayout
-            breadcrumbs={[
-                {
-                    title: 'Dashboard',
-                    href: dashboard(),
-                },
-                {
-                    title: 'Attendance',
-                    href: attendance.index(),
-                },
-            ]}
-        >
+        <>
             <Head title="Attendance" />
 
             <div className="flex h-full flex-1 flex-col gap-6 p-6">
@@ -367,6 +355,19 @@ export default function Index({ attendances }: AttendanceProps) {
                     )}
                 </div>
             </div>
-        </AppLayout>
+        </>
     );
 }
+
+Index.layout = {
+    breadcrumbs: [
+        {
+            title: 'Dashboard',
+            href: dashboard(),
+        },
+        {
+            title: 'Attendance',
+            href: attendance.index(),
+        },
+    ],
+};
