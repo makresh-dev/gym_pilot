@@ -7,6 +7,7 @@ use App\Enums\PaymentMethod;
 use App\Http\Requests\StoreAttendanceRequest;
 use App\Http\Requests\StoreInterventionRequest;
 use App\Http\Requests\StoreMemberRequest;
+use App\Http\Requests\StoreMembershipRenewalRequest;
 use App\Http\Requests\StoreMembershipRequest;
 use App\Http\Requests\StorePaymentRequest;
 use App\Http\Requests\UpdateMemberRequest;
@@ -17,6 +18,7 @@ use App\Models\MembershipPlan;
 use App\Models\Signal;
 use App\Services\AttendanceService;
 use App\Services\Intelligence\InterventionService;
+use App\Services\MembershipRenewalService;
 use App\Services\MembershipService;
 use App\Services\PaymentService;
 use Carbon\Carbon;
@@ -84,10 +86,11 @@ class MemberController extends Controller
 
         /*
          * lifecycle_status is a derived attribute on Membership.
-         * Append it so Inertia includes it in the serialized member data.
          */
         $member->memberships->each(
-            fn (Membership $membership) => $membership->append('lifecycle_status')
+            fn (Membership $membership) => $membership->append(
+                'lifecycle_status'
+            )
         );
 
         $member->setRelation(
@@ -234,9 +237,9 @@ class MemberController extends Controller
         }
 
         $methods = array_map(
-            fn (PaymentMethod $m) => [
-                'value' => $m->value,
-                'label' => $m->getLabel(),
+            fn (PaymentMethod $method) => [
+                'value' => $method->value,
+                'label' => $method->getLabel(),
             ],
             PaymentMethod::cases(),
         );
@@ -246,11 +249,13 @@ class MemberController extends Controller
                 'id' => $member->id,
                 'name' => $member->name,
             ],
+
             'membership' => [
                 'id' => $membership->id,
                 'status' => $membership->status,
                 'balance_due' => $membership->balanceDue(),
             ],
+
             'payment_methods' => $methods,
         ]);
     }
@@ -290,5 +295,128 @@ class MemberController extends Controller
         $attendanceService->checkIn($member);
 
         return back();
+    }
+
+    /*
+     * Show the renewal form.
+     */
+    public function createRenewal(
+        Member $member,
+        Membership $membership,
+    ): Response {
+        Gate::authorize('view', $member);
+
+        if ($membership->member_id !== $member->id) {
+            abort(404);
+        }
+
+        $membership->load('membershipPlan');
+
+        $plans = MembershipPlan::query()
+            ->where('organization_id', $member->organization_id)
+            ->where('is_active', true)
+            ->orderBy('name')
+            ->get([
+                'id',
+                'name',
+                'price',
+                'duration_days',
+            ]);
+
+        $today = Carbon::today();
+
+        /*
+         * Active membership:
+         * renewal starts the day after the current membership ends.
+         *
+         * Expired membership:
+         * renewal starts today.
+         */
+        $suggestedStartDate = $membership->end_date->gte($today)
+            ? $membership->end_date->copy()->addDay()
+            : $today;
+
+        $paymentMethods = array_map(
+            fn (PaymentMethod $method) => [
+                'value' => $method->value,
+                'label' => $method->getLabel(),
+            ],
+            PaymentMethod::cases(),
+        );
+
+        return Inertia::render('Members/RenewMembership', [
+            'member' => [
+                'id' => $member->id,
+                'name' => $member->name,
+            ],
+
+            'membership' => [
+                'id' => $membership->id,
+                'start_date' => $membership->start_date,
+                'end_date' => $membership->end_date,
+                'price' => $membership->price,
+                'lifecycle_status' => $membership->lifecycle_status,
+                'membership_plan' => [
+                    'name' => $membership->membershipPlan->name,
+                ],
+            ],
+
+            'plans' => $plans,
+
+            'payment_methods' => $paymentMethods,
+
+            'suggested_start_date' => $suggestedStartDate->toDateString(),
+        ]);
+    }
+
+    /*
+     * Create the new membership and optionally record payment.
+     */
+    public function renewMembership(
+        StoreMembershipRenewalRequest $request,
+        Member $member,
+        Membership $membership,
+        MembershipRenewalService $membershipRenewalService,
+    ): RedirectResponse {
+        Gate::authorize('view', $member);
+
+        if ($membership->member_id !== $member->id) {
+            abort(404);
+        }
+
+        $plan = MembershipPlan::query()
+            ->where('organization_id', $member->organization_id)
+            ->where('is_active', true)
+            ->findOrFail(
+                $request->input('membership_plan_id')
+            );
+
+        $recordPayment = $request->boolean('payment');
+
+        $paymentMethod = null;
+
+        if ($recordPayment) {
+            $paymentMethod = PaymentMethod::from(
+                $request->string('payment_method')->toString()
+            );
+        }
+
+        $membershipRenewalService->renew(
+            member: $member,
+            membership: $membership,
+            plan: $plan,
+            startDate: Carbon::parse(
+                $request->input('start_date')
+            ),
+            recordPayment: $recordPayment,
+            paymentAmount: $request->input('payment_amount'),
+            paymentMethod: $paymentMethod,
+            paidAt: $request->filled('paid_at')
+                ? Carbon::parse($request->input('paid_at'))
+                : null,
+        );
+
+        return redirect()
+            ->route('members.show', $member);
     }
 }

@@ -10,6 +10,8 @@ import AppLogo from '@/components/app-logo';
 import { NavFooter } from '@/components/nav-footer';
 import { NavMain } from '@/components/nav-main';
 import { NavUser } from '@/components/nav-user';
+import { CreditCard } from 'lucide-react';
+import membershipPlans from '@/routes/membership-plans';
 
 import {
     Sidebar,
@@ -35,6 +37,12 @@ const mainNavItems: NavItem[] = [
         title: 'Attendance',
         href: attendance.index(),
         icon: CalendarCheck2,
+    },
+
+    {
+        title: 'Membership Plans',
+        href: membershipPlans.index(),
+        icon: CreditCard,
     },
 ];
 

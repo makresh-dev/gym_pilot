@@ -21,10 +21,22 @@ class DashboardController extends Controller
         $organizationId = $user->organization_id;
         $today = Carbon::today();
 
+        /*
+         * Members with a currently valid membership.
+         */
         $activeMembers = Member::query()
             ->where('organization_id', $organizationId)
+            ->whereHas('memberships', function ($query) use ($today) {
+                $query
+                    ->where('status', 'active')
+                    ->whereDate('start_date', '<=', $today)
+                    ->whereDate('end_date', '>=', $today);
+            })
             ->count();
 
+        /*
+         * Check-ins recorded today.
+         */
         $todayCheckIns = Attendance::query()
             ->where('organization_id', $organizationId)
             ->whereDate('check_in_at', $today)
@@ -43,6 +55,9 @@ class DashboardController extends Controller
             ])
             ->count();
 
+        /*
+         * Open signals requiring attention.
+         */
         $openSignals = Signal::query()
             ->where('organization_id', $organizationId)
             ->where('status', 'open')
@@ -54,6 +69,8 @@ class DashboardController extends Controller
         $outstandingBalance = Membership::query()
             ->where('organization_id', $organizationId)
             ->where('status', 'active')
+            ->whereDate('start_date', '<=', $today)
+            ->whereDate('end_date', '>=', $today)
             ->with('payments')
             ->get()
             ->sum(function (Membership $membership) {
@@ -61,7 +78,7 @@ class DashboardController extends Controller
             });
 
         /*
-         * Open signals requiring attention.
+         * Latest open signals for the dashboard.
          */
         $signals = Signal::query()
             ->where('organization_id', $organizationId)

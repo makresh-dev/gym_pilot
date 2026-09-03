@@ -8,13 +8,6 @@ type Payment = {
     paid_at: string;
 };
 
-type MembershipPlan = {
-    id: string;
-    name: string;
-    price: string;
-    duration_days: number;
-};
-
 type Membership = {
     id: string;
     start_date: string;
@@ -406,6 +399,12 @@ export default function Show({ member, checkedInToday }: ShowProps) {
                                                     membership.lifecycle_status ??
                                                     membership.status;
 
+                                                const canRenew =
+                                                    lifecycleStatus ===
+                                                    'active' ||
+                                                    lifecycleStatus ===
+                                                    'expired';
+
                                                 return (
                                                     <tr
                                                         key={membership.id}
@@ -433,9 +432,7 @@ export default function Show({ member, checkedInToday }: ShowProps) {
 
                                                         <td className="px-3 py-3">
                                                             ₹
-                                                            {
-                                                                membership.price
-                                                            }
+                                                            {membership.price}
                                                         </td>
 
                                                         <td className="px-3 py-3">
@@ -461,24 +458,40 @@ export default function Show({ member, checkedInToday }: ShowProps) {
 
                                                         <td className="px-3 py-3">
                                                             <span className="rounded-full border px-2.5 py-1 text-xs font-medium capitalize">
-                                                                {lifecycleStatus}
+                                                                {
+                                                                    lifecycleStatus
+                                                                }
                                                             </span>
                                                         </td>
 
                                                         <td className="px-3 py-3 text-right">
-                                                            {balance > 0 ? (
-                                                                <Link
-                                                                    href={`/members/${member.id}/memberships/${membership.id}/payments/create`}
-                                                                    className="font-medium hover:underline"
-                                                                >
-                                                                    Record
-                                                                    payment
-                                                                </Link>
-                                                            ) : (
-                                                                <span className="text-sm text-muted-foreground">
-                                                                    Paid
-                                                                </span>
-                                                            )}
+                                                            <div className="flex justify-end gap-3">
+                                                                {balance > 0 && (
+                                                                    <Link
+                                                                        href={`/members/${member.id}/memberships/${membership.id}/payments/create`}
+                                                                        className="font-medium hover:underline"
+                                                                    >
+                                                                        Record
+                                                                        payment
+                                                                    </Link>
+                                                                )}
+
+                                                                {canRenew && (
+                                                                    <Link
+                                                                        href={`/members/${member.id}/memberships/${membership.id}/renew`}
+                                                                        className="font-medium hover:underline"
+                                                                    >
+                                                                        Renew
+                                                                    </Link>
+                                                                )}
+
+                                                                {balance === 0 &&
+                                                                    !canRenew && (
+                                                                        <span className="text-sm text-muted-foreground">
+                                                                            Paid
+                                                                        </span>
+                                                                    )}
+                                                            </div>
                                                         </td>
                                                     </tr>
                                                 );

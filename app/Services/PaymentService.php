@@ -23,7 +23,31 @@ class PaymentService
             );
         }
 
+        if (! $membership->exists) {
+            throw new InvalidArgumentException(
+                'Membership does not exist.'
+            );
+        }
+
+        if (! $membership->member_id) {
+            throw new InvalidArgumentException(
+                'Membership must belong to a member.'
+            );
+        }
+
+        if (! $membership->organization_id) {
+            throw new InvalidArgumentException(
+                'Membership must belong to an organization.'
+            );
+        }
+
         $balanceDue = $membership->balanceDue();
+
+        if ($balanceDue <= 0) {
+            throw new InvalidArgumentException(
+                'Membership has no outstanding balance.'
+            );
+        }
 
         if ($amount > $balanceDue) {
             throw new InvalidArgumentException(
@@ -35,7 +59,7 @@ class PaymentService
             $membership,
             $amount,
             $paymentMethod,
-            $paidAt
+            $paidAt,
         ) {
             return Payment::create([
                 'organization_id' => $membership->organization_id,

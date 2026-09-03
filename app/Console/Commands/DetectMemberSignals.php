@@ -10,6 +10,7 @@ use App\Services\Intelligence\AttendanceDeclineResolver;
 use App\Services\Intelligence\MembershipExpiryDetector;
 use App\Services\Intelligence\MembershipExpiryResolver;
 use App\Services\Intelligence\SignalService;
+use Carbon\Carbon;
 use Illuminate\Console\Command;
 
 class DetectMemberSignals extends Command
@@ -69,18 +70,49 @@ class DetectMemberSignals extends Command
             if ($openMembershipExpirySignal) {
                 if ($membershipExpiryResolver->resolve($openMembershipExpirySignal)) {
                     $resolved++;
-                }
-            } else {
-                $membershipDetection = $membershipExpiryDetector->detect($member);
 
-                if ($membershipDetection !== null) {
-                    $signalService->createFromDetection(
-                        $member,
-                        $membershipDetection
-                    );
-
-                    $detected++;
+                    continue;
                 }
+
+                /*
+                 * The membership has now expired without renewal.
+                 *
+                 * The original "expiring" condition is no longer true,
+                 * so close the stale signal. We reserve DISMISSED for
+                 * intentional staff decisions.
+                 */
+                $hasExpiredMembership = $member->memberships()
+                    ->where('status', 'active')
+                    ->whereDate('end_date', '<', Carbon::today())
+                    ->exists();
+
+                $hasCurrentMembership = $member->memberships()
+                    ->where('status', 'active')
+                    ->whereDate('start_date', '<=', Carbon::today())
+                    ->whereDate('end_date', '>=', Carbon::today())
+                    ->exists();
+
+                if ($hasExpiredMembership && ! $hasCurrentMembership) {
+                    $openMembershipExpirySignal->update([
+                        'status' => SignalStatus::RESOLVED->value,
+                        'resolved_at' => now(),
+                    ]);
+
+                    $resolved++;
+                }
+
+                continue;
+            }
+
+            $membershipDetection = $membershipExpiryDetector->detect($member);
+
+            if ($membershipDetection !== null) {
+                $signalService->createFromDetection(
+                    $member,
+                    $membershipDetection
+                );
+
+                $detected++;
             }
         }
 
