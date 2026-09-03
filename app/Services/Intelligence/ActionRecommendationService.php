@@ -16,6 +16,12 @@ class ActionRecommendationService
                 'reason' => 'Ask about the recent change in attendance.',
             ],
 
+            SignalType::MEMBERSHIP_EXPIRY => [
+                'type' => 'contact_member',
+                'label' => 'Contact member',
+                'reason' => 'Membership is expiring soon',
+            ],
+
             default => null,
         };
     }

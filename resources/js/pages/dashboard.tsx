@@ -32,6 +32,11 @@ type Signal = {
         recent_average?: number;
         decline_percentage?: number;
         expected_visits_per_week?: number | null;
+
+        days_remaining?: number;
+        membership_end_date?: string;
+        plan?: string | null;
+        price?: string | number;
     };
 
     detected_at: string;
@@ -149,22 +154,14 @@ type SignalCardProps = {
 };
 
 function SignalCard({ signal }: SignalCardProps) {
-    const hasDecline =
-        signal.evidence.decline_percentage !== undefined;
+    const isAttendanceDecline =
+        signal.type === 'attendance_decline';
 
-    const hasBaseline =
-        signal.evidence.baseline_average !== undefined;
-
-    const hasRecent =
-        signal.evidence.recent_average !== undefined;
-
-    const hasExpected =
-        signal.evidence.expected_visits_per_week !== undefined &&
-        signal.evidence.expected_visits_per_week !== null;
+    const isMembershipExpiring =
+        signal.type === 'membership_expiring';
 
     return (
         <div className="rounded-lg border p-4">
-            {/* Signal header */}
             <div className="flex items-start justify-between gap-4">
                 <div>
                     <Link
@@ -184,44 +181,97 @@ function SignalCard({ signal }: SignalCardProps) {
                 </span>
             </div>
 
-            {/* Signal evidence */}
-            <div className="mt-4 space-y-1">
-                {hasDecline && (
-                    <p className="text-sm">
-                        Attendance declined by{' '}
-                        <span className="font-medium">
-                            {signal.evidence.decline_percentage}%
-                        </span>
-                        .
-                    </p>
-                )}
-
-                <div className="flex flex-wrap gap-x-6 gap-y-1 text-sm text-muted-foreground">
-                    {hasBaseline && (
-                        <span>
-                            Baseline:{' '}
-                            {signal.evidence.baseline_average}
-                            /week
-                        </span>
+            {/* Attendance decline */}
+            {isAttendanceDecline && (
+                <div className="mt-4 space-y-1">
+                    {signal.evidence.decline_percentage !== undefined && (
+                        <p className="text-sm">
+                            Attendance declined by{' '}
+                            <span className="font-medium">
+                                {signal.evidence.decline_percentage}%
+                            </span>
+                            .
+                        </p>
                     )}
 
-                    {hasRecent && (
-                        <span>
-                            Recent:{' '}
-                            {signal.evidence.recent_average}
-                            /week
-                        </span>
-                    )}
+                    <div className="flex flex-wrap gap-x-6 gap-y-1 text-sm text-muted-foreground">
+                        {signal.evidence.baseline_average !== undefined && (
+                            <span>
+                                Baseline:{' '}
+                                {signal.evidence.baseline_average}
+                                /week
+                            </span>
+                        )}
 
-                    {hasExpected && (
-                        <span>
-                            Expected:{' '}
-                            {signal.evidence.expected_visits_per_week}
-                            /week
-                        </span>
-                    )}
+                        {signal.evidence.recent_average !== undefined && (
+                            <span>
+                                Recent:{' '}
+                                {signal.evidence.recent_average}
+                                /week
+                            </span>
+                        )}
+
+                        {signal.evidence.expected_visits_per_week !==
+                            undefined &&
+                            signal.evidence.expected_visits_per_week !==
+                            null && (
+                                <span>
+                                    Expected:{' '}
+                                    {
+                                        signal.evidence
+                                            .expected_visits_per_week
+                                    }
+                                    /week
+                                </span>
+                            )}
+                    </div>
                 </div>
-            </div>
+            )}
+
+            {/* Membership expiry */}
+            {isMembershipExpiring && (
+                <div className="mt-4 space-y-1">
+                    {signal.evidence.days_remaining !== undefined && (
+                        <p className="text-sm">
+                            Membership expires in{' '}
+                            <span className="font-medium">
+                                {signal.evidence.days_remaining}{' '}
+                                {signal.evidence.days_remaining === 1
+                                    ? 'day'
+                                    : 'days'}
+                            </span>
+                            .
+                        </p>
+                    )}
+
+                    <div className="flex flex-wrap gap-x-6 gap-y-1 text-sm text-muted-foreground">
+                        {signal.evidence.membership_end_date && (
+                            <span>
+                                Ends:{' '}
+                                {new Date(
+                                    signal.evidence.membership_end_date,
+                                ).toLocaleDateString([], {
+                                    day: 'numeric',
+                                    month: 'short',
+                                    year: 'numeric',
+                                })}
+                            </span>
+                        )}
+
+                        {signal.evidence.plan && (
+                            <span>
+                                Plan: {signal.evidence.plan}
+                            </span>
+                        )}
+
+                        {signal.evidence.price !== undefined && (
+                            <span>
+                                Price: ₹{signal.evidence.price}
+                            </span>
+                        )}
+                    </div>
+                </div>
+            )}
 
             {/* Recommended action */}
             {signal.recommendation && (

@@ -24,6 +24,8 @@ type AttendanceRecord = {
 type AttendanceStatus = {
     checked_in: boolean;
     check_in_at: string | null;
+    membership_active: boolean;
+    membership_end_date: string | null;
 };
 
 type AttendanceProps = {
@@ -133,7 +135,11 @@ export default function Index({ attendances }: AttendanceProps) {
     const checkIn = (event: React.FormEvent) => {
         event.preventDefault();
 
-        if (!data.member_id || attendanceStatus?.checked_in) {
+        if (
+            !data.member_id ||
+            attendanceStatus?.checked_in ||
+            !attendanceStatus?.membership_active
+        ) {
             return;
         }
 
@@ -243,10 +249,10 @@ export default function Index({ attendances }: AttendanceProps) {
                                     </button>
                                 </div>
 
-                                <div className="mt-4">
+                                <div className="mt-4 space-y-3">
                                     {checkingStatus && (
                                         <p className="text-sm text-muted-foreground">
-                                            Checking today&apos;s attendance...
+                                            Checking member status...
                                         </p>
                                     )}
 
@@ -281,16 +287,57 @@ export default function Index({ attendances }: AttendanceProps) {
 
                                     {!checkingStatus &&
                                         attendanceStatus &&
-                                        !attendanceStatus.checked_in && (
-                                            <button
-                                                type="submit"
-                                                disabled={processing}
-                                                className="w-full rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground disabled:opacity-50"
-                                            >
-                                                {processing
-                                                    ? 'Checking in...'
-                                                    : 'Check In'}
-                                            </button>
+                                        !attendanceStatus.checked_in &&
+                                        !attendanceStatus.membership_active && (
+                                            <div className="rounded-md border border-destructive/30 bg-destructive/5 px-4 py-3">
+                                                <p className="font-medium">
+                                                    Membership inactive
+                                                </p>
+
+                                                <p className="mt-1 text-sm text-muted-foreground">
+                                                    This member does not have an
+                                                    active membership today.
+                                                </p>
+                                            </div>
+                                        )}
+
+                                    {!checkingStatus &&
+                                        attendanceStatus &&
+                                        !attendanceStatus.checked_in &&
+                                        attendanceStatus.membership_active && (
+                                            <>
+                                                <div className="rounded-md border px-4 py-3">
+                                                    <p className="font-medium">
+                                                        Membership active
+                                                    </p>
+
+                                                    {attendanceStatus.membership_end_date && (
+                                                        <p className="mt-1 text-sm text-muted-foreground">
+                                                            Valid until{' '}
+                                                            {new Date(
+                                                                attendanceStatus.membership_end_date,
+                                                            ).toLocaleDateString(
+                                                                [],
+                                                                {
+                                                                    day: 'numeric',
+                                                                    month: 'short',
+                                                                    year: 'numeric',
+                                                                },
+                                                            )}
+                                                        </p>
+                                                    )}
+                                                </div>
+
+                                                <button
+                                                    type="submit"
+                                                    disabled={processing}
+                                                    className="w-full rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground disabled:opacity-50"
+                                                >
+                                                    {processing
+                                                        ? 'Checking in...'
+                                                        : 'Check In'}
+                                                </button>
+                                            </>
                                         )}
                                 </div>
                             </div>

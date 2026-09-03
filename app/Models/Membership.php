@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use Carbon\Carbon;
 use Illuminate\Database\Eloquent\Concerns\HasUlids;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
@@ -59,5 +60,45 @@ class Membership extends Model
     public function payments(): HasMany
     {
         return $this->hasMany(Payment::class);
+    }
+
+    public function isActive(?Carbon $date = null): bool
+    {
+        $date ??= Carbon::today();
+
+        return $this->status === 'active'
+            && $this->start_date->lte($date)
+            && $this->end_date->gte($date);
+    }
+
+    public function isUpcoming(?Carbon $date = null): bool
+    {
+        $date ??= Carbon::today();
+
+        return $this->start_date->gt($date);
+    }
+
+    public function isExpired(?Carbon $date = null): bool
+    {
+        $date ??= Carbon::today();
+
+        return $this->end_date->lt($date);
+    }
+
+    public function getLifecycleStatusAttribute(): string
+    {
+        if ($this->isUpcoming()) {
+            return 'upcoming';
+        }
+
+        if ($this->isExpired()) {
+            return 'expired';
+        }
+
+        if ($this->isActive()) {
+            return 'active';
+        }
+
+        return 'inactive';
     }
 }

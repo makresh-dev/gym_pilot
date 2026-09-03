@@ -110,14 +110,26 @@ class AttendanceController extends Controller
         404
     );
 
+    $today = today();
+
     $attendance = $member->attendances()
-        ->whereDate('check_in_at', today())
+        ->whereDate('check_in_at', $today)
         ->latest('check_in_at')
+        ->first();
+
+    $membership = $member->memberships()
+        ->where('status', 'active')
+        ->whereDate('start_date', '<=', $today)
+        ->whereDate('end_date', '>=', $today)
+        ->latest('end_date')
         ->first();
 
     return response()->json([
         'checked_in' => $attendance !== null,
         'check_in_at' => $attendance?->check_in_at,
+
+        'membership_active' => $membership !== null,
+        'membership_end_date' => $membership?->end_date,
     ]);
 }
 }

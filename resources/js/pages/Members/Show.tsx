@@ -21,7 +21,10 @@ type Membership = {
     end_date: string;
     price: string;
     status: string;
-    membership_plan: MembershipPlan;
+    lifecycle_status?: string;
+    membership_plan: {
+        name: string;
+    };
     payments: Payment[];
 };
 
@@ -63,6 +66,12 @@ type Signal = {
     interventions: Intervention[];
 };
 
+type Attendance = {
+    id: string;
+    check_in_at: string;
+    source: string;
+};
+
 type Member = {
     id: string;
     name: string;
@@ -86,12 +95,6 @@ type InterventionForm = {
     type: string;
     notes: string;
     outcome: string;
-};
-
-type Attendance = {
-    id: string;
-    check_in_at: string;
-    source: string;
 };
 
 export default function Show({ member, checkedInToday }: ShowProps) {
@@ -130,51 +133,59 @@ export default function Show({ member, checkedInToday }: ShowProps) {
                             {member.email ? ` · ${member.email}` : ''}
                         </p>
                     </div>
-                    <button
-                        type="button"
-                        disabled={checkedInToday}
-                        onClick={() => {
-                            router.post(
-                                `/members/${member.id}/attendance`,
-                                {
-                                    check_in_at: new Date().toISOString(),
-                                },
-                                {
-                                    preserveScroll: true,
-                                },
-                            );
-                        }}
-                        className="rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground disabled:cursor-not-allowed disabled:opacity-50"
-                    >
-                        {checkedInToday ? 'Checked In Today' : 'Check In'}
-                    </button>
-                    <Link
-                        href={`/members/${member.id}/memberships/create`}
-                        className="rounded-md border px-4 py-2 text-sm font-medium"
-                    >
-                        Add Membership
-                    </Link>
-                    <Link
-                        href={`/members/${member.id}/edit`}
-                        className="rounded-md border px-4 py-2 text-sm font-medium"
-                    >
-                        Edit
-                    </Link>
-                    <button
-                        type="button"
-                        onClick={() => {
-                            if (
-                                window.confirm(
-                                    `Archive ${member.name}? Their historical data will be preserved.`,
-                                )
-                            ) {
-                                router.delete(`/members/${member.id}`);
-                            }
-                        }}
-                        className="rounded-md border px-4 py-2 text-sm font-medium text-destructive"
-                    >
-                        Archive
-                    </button>
+
+                    <div className="mt-4 flex flex-wrap gap-2">
+                        <button
+                            type="button"
+                            disabled={checkedInToday}
+                            onClick={() => {
+                                router.post(
+                                    `/members/${member.id}/attendance`,
+                                    {
+                                        check_in_at: new Date().toISOString(),
+                                    },
+                                    {
+                                        preserveScroll: true,
+                                    },
+                                );
+                            }}
+                            className="rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground disabled:cursor-not-allowed disabled:opacity-50"
+                        >
+                            {checkedInToday
+                                ? 'Checked In Today'
+                                : 'Check In'}
+                        </button>
+
+                        <Link
+                            href={`/members/${member.id}/memberships/create`}
+                            className="rounded-md border px-4 py-2 text-sm font-medium"
+                        >
+                            Add Membership
+                        </Link>
+
+                        <Link
+                            href={`/members/${member.id}/edit`}
+                            className="rounded-md border px-4 py-2 text-sm font-medium"
+                        >
+                            Edit
+                        </Link>
+
+                        <button
+                            type="button"
+                            onClick={() => {
+                                if (
+                                    window.confirm(
+                                        `Archive ${member.name}? Their historical data will be preserved.`,
+                                    )
+                                ) {
+                                    router.delete(`/members/${member.id}`);
+                                }
+                            }}
+                            className="rounded-md border px-4 py-2 text-sm font-medium text-destructive"
+                        >
+                            Archive
+                        </button>
+                    </div>
                 </div>
 
                 <div className="grid gap-6 md:grid-cols-2">
@@ -189,6 +200,7 @@ export default function Show({ member, checkedInToday }: ShowProps) {
                                 <span className="text-muted-foreground">
                                     Phone
                                 </span>
+
                                 <span>{member.phone}</span>
                             </div>
 
@@ -219,7 +231,6 @@ export default function Show({ member, checkedInToday }: ShowProps) {
                         <h2 className="text-lg font-semibold">
                             Context
                         </h2>
-
 
                         <div className="mt-4 space-y-4 text-sm">
                             <div>
@@ -373,79 +384,106 @@ export default function Show({ member, checkedInToday }: ShowProps) {
                                             </td>
                                         </tr>
                                     ) : (
-                                        member.memberships.map((membership) => {
-                                            const paid = membership.payments.reduce(
-                                                (total, payment) =>
-                                                    total + Number(payment.amount),
-                                                0,
-                                            );
+                                        member.memberships.map(
+                                            (membership) => {
+                                                const paid =
+                                                    membership.payments.reduce(
+                                                        (total, payment) =>
+                                                            total +
+                                                            Number(
+                                                                payment.amount,
+                                                            ),
+                                                        0,
+                                                    );
 
-                                            const balance = Math.max(
-                                                0,
-                                                Number(membership.price) - paid,
-                                            );
+                                                const balance = Math.max(
+                                                    0,
+                                                    Number(membership.price) -
+                                                    paid,
+                                                );
 
-                                            return (
-                                                <tr
-                                                    key={membership.id}
-                                                    className="border-b last:border-0"
-                                                >
-                                                    <td className="px-3 py-3">
-                                                        {
-                                                            membership.membership_plan
-                                                                .name
-                                                        }
-                                                    </td>
+                                                const lifecycleStatus =
+                                                    membership.lifecycle_status ??
+                                                    membership.status;
 
-                                                    <td className="px-3 py-3">
-                                                        {membership.start_date}
-                                                    </td>
-
-                                                    <td className="px-3 py-3">
-                                                        {membership.end_date}
-                                                    </td>
-
-                                                    <td className="px-3 py-3">
-                                                        ₹{membership.price}
-                                                    </td>
-
-                                                    <td className="px-3 py-3">
-                                                        ₹{paid.toFixed(2)}
-                                                    </td>
-
-                                                    <td className="px-3 py-3">
-                                                        <span
-                                                            className={
-                                                                balance > 0
-                                                                    ? 'font-medium text-destructive'
-                                                                    : 'font-medium'
+                                                return (
+                                                    <tr
+                                                        key={membership.id}
+                                                        className="border-b last:border-0"
+                                                    >
+                                                        <td className="px-3 py-3">
+                                                            {
+                                                                membership
+                                                                    .membership_plan
+                                                                    .name
                                                             }
-                                                        >
-                                                            ₹{balance.toFixed(2)}
-                                                        </span>
-                                                    </td>
+                                                        </td>
 
-                                                    <td className="px-3 py-3 capitalize">
-                                                        {membership.status}
-                                                    </td>
+                                                        <td className="px-3 py-3">
+                                                            {
+                                                                membership.start_date
+                                                            }
+                                                        </td>
 
-                                                    <td className="px-3 py-3 text-right">
-                                                        {balance > 0 ? (
-                                                            <Link
-                                                                href={`/members/${member.id}/memberships/${membership.id}/payments/create`}
-                                                                className="font-medium hover:underline"
+                                                        <td className="px-3 py-3">
+                                                            {
+                                                                membership.end_date
+                                                            }
+                                                        </td>
+
+                                                        <td className="px-3 py-3">
+                                                            ₹
+                                                            {
+                                                                membership.price
+                                                            }
+                                                        </td>
+
+                                                        <td className="px-3 py-3">
+                                                            ₹
+                                                            {paid.toFixed(2)}
+                                                        </td>
+
+                                                        <td className="px-3 py-3">
+                                                            <span
+                                                                className={
+                                                                    balance >
+                                                                        0
+                                                                        ? 'font-medium text-destructive'
+                                                                        : 'font-medium'
+                                                                }
                                                             >
-                                                                Record payment
-                                                            </Link>
-                                                        ) : (
-                                                            <span className="text-sm text-muted-foreground">
-                                                                Paid
+                                                                ₹
+                                                                {balance.toFixed(
+                                                                    2,
+                                                                )}
                                                             </span>
-                                                        )}
-                                                    </td>
-                                                </tr>
-                                            );
-                                        })
+                                                        </td>
+
+                                                        <td className="px-3 py-3">
+                                                            <span className="rounded-full border px-2.5 py-1 text-xs font-medium capitalize">
+                                                                {lifecycleStatus}
+                                                            </span>
+                                                        </td>
+
+                                                        <td className="px-3 py-3 text-right">
+                                                            {balance > 0 ? (
+                                                                <Link
+                                                                    href={`/members/${member.id}/memberships/${membership.id}/payments/create`}
+                                                                    className="font-medium hover:underline"
+                                                                >
+                                                                    Record
+                                                                    payment
+                                                                </Link>
+                                                            ) : (
+                                                                <span className="text-sm text-muted-foreground">
+                                                                    Paid
+                                                                </span>
+                                                            )}
+                                                        </td>
+                                                    </tr>
+                                                );
+                                            },
+                                        )
                                     )}
                                 </tbody>
                             </table>
@@ -591,26 +629,20 @@ function SignalCard({
 
             {signal.evidence.baseline_average !== undefined && (
                 <p className="mt-1 text-sm text-muted-foreground">
-                    Baseline:{' '}
-                    {signal.evidence.baseline_average}{' '}
-                    visits/week
+                    Baseline: {signal.evidence.baseline_average} visits/week
                 </p>
             )}
 
             {signal.evidence.recent_average !== undefined && (
                 <p className="mt-1 text-sm text-muted-foreground">
-                    Recent:{' '}
-                    {signal.evidence.recent_average}{' '}
-                    visits/week
+                    Recent: {signal.evidence.recent_average} visits/week
                 </p>
             )}
 
-            {signal.evidence.expected_visits_per_week !==
-                undefined &&
+            {signal.evidence.expected_visits_per_week !== undefined &&
                 signal.evidence.expected_visits_per_week !== null && (
                     <p className="mt-1 text-sm text-muted-foreground">
-                        Expected:{' '}
-                        {signal.evidence.expected_visits_per_week}{' '}
+                        Expected: {signal.evidence.expected_visits_per_week}{' '}
                         visits/week
                     </p>
                 )}

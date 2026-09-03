@@ -23,6 +23,18 @@ class AttendanceService
                 );
             }
 
+            $hasValidMembership = $member->memberships()
+                ->get()
+                ->contains(
+                    fn ($membership) => $membership->isActive()
+                );
+
+            if (! $hasValidMembership) {
+                throw new RuntimeException(
+                    'Member does not have an active membership today.'
+                );
+            }
+
             return $member->attendances()->create([
                 'organization_id' => $member->organization_id,
                 'check_in_at' => now(),
