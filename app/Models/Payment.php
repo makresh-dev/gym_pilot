@@ -1,17 +1,16 @@
 <?php
 
-
-
 namespace App\Models;
 
-use Illuminate\Database\Eloquent\Concerns\HasUlids;
 use App\Enums\PaymentMethod;
+use Illuminate\Database\Eloquent\Concerns\HasUlids;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
 class Payment extends Model
 {
     use HasUlids;
+
     protected $fillable = [
         'organization_id',
         'member_id',
@@ -28,7 +27,7 @@ class Payment extends Model
             'paid_at' => 'datetime',
             'payment_method' => PaymentMethod::class,
         ];
-    }   
+    }
 
     public function organization(): BelongsTo
     {

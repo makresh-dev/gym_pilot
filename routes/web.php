@@ -91,6 +91,23 @@ Route::middleware(['auth'])->group(function () {
         '/membership-plans/{membershipPlan}/toggle-status',
         [MembershipPlanController::class, 'toggleStatus']
     )->name('membership-plans.toggle-status');
+
+    Route::post('/members/{member}/interventions', [
+    MemberController::class,
+    'storeIntervention',
+    ])->name('members.interventions.store');
+
+    Route::post('/members/{member}/signals/{signal}/dismiss', [
+    MemberController::class,
+    'dismissSignal',
+    ])->name('members.signals.dismiss');
+
+    Route::post('/members/{member}/signals/{signal}/dismiss', [
+    MemberController::class,
+    'dismissSignal',
+    ])->name('members.signals.dismiss');
+
+
 });
 
 require __DIR__.'/settings.php';

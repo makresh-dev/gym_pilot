@@ -16,13 +16,8 @@ class MembershipExpiryDetector
         $today = Carbon::today();
 
         $membership = $member->memberships()
-            ->where('status', 'active')
-            ->whereDate('start_date', '<=', $today)
-            ->whereDate(
-                'end_date',
-                '>=',
-                $today
-            )
+            ->with('membershipPlan')
+            ->currentlyActive()
             ->whereDate(
                 'end_date',
                 '<=',

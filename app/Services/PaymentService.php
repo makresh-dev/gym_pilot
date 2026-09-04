@@ -41,30 +41,46 @@ class PaymentService
             );
         }
 
-        $balanceDue = $membership->balanceDue();
-
-        if ($balanceDue <= 0) {
-            throw new InvalidArgumentException(
-                'Membership has no outstanding balance.'
-            );
-        }
-
-        if ($amount > $balanceDue) {
-            throw new InvalidArgumentException(
-                'Payment amount cannot exceed the outstanding balance.'
-            );
-        }
-
         return DB::transaction(function () use (
             $membership,
             $amount,
             $paymentMethod,
             $paidAt,
         ) {
+            /*
+             * Lock the membership before calculating the outstanding
+             * balance. This prevents concurrent payment requests from
+             * both using the same stale balance.
+             */
+            $lockedMembership = Membership::query()
+                ->whereKey($membership->id)
+                ->lockForUpdate()
+                ->first();
+
+            if (! $lockedMembership) {
+                throw new InvalidArgumentException(
+                    'Membership does not exist.'
+                );
+            }
+
+            $balanceDue = $lockedMembership->balanceDue();
+
+            if ($balanceDue <= 0) {
+                throw new InvalidArgumentException(
+                    'Membership has no outstanding balance.'
+                );
+            }
+
+            if ($amount > $balanceDue) {
+                throw new InvalidArgumentException(
+                    'Payment amount cannot exceed the outstanding balance.'
+                );
+            }
+
             return Payment::create([
-                'organization_id' => $membership->organization_id,
-                'member_id' => $membership->member_id,
-                'membership_id' => $membership->id,
+                'organization_id' => $lockedMembership->organization_id,
+                'member_id' => $lockedMembership->member_id,
+                'membership_id' => $lockedMembership->id,
                 'amount' => $amount,
                 'payment_method' => $paymentMethod->value,
                 'paid_at' => $paidAt,

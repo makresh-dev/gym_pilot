@@ -7,7 +7,6 @@ use App\Models\Member;
 use App\Models\Membership;
 use App\Models\Signal;
 use App\Services\Intelligence\ActionRecommendationService;
-use Carbon\Carbon;
 use Inertia\Inertia;
 use Inertia\Response;
 
@@ -19,18 +18,14 @@ class DashboardController extends Controller
         $user = auth()->user();
 
         $organizationId = $user->organization_id;
-        $today = Carbon::today();
 
         /*
          * Members with a currently valid membership.
          */
         $activeMembers = Member::query()
             ->where('organization_id', $organizationId)
-            ->whereHas('memberships', function ($query) use ($today) {
-                $query
-                    ->where('status', 'active')
-                    ->whereDate('start_date', '<=', $today)
-                    ->whereDate('end_date', '>=', $today);
+            ->whereHas('memberships', function ($query) {
+                $query->currentlyActive();
             })
             ->count();
 
@@ -39,7 +34,7 @@ class DashboardController extends Controller
          */
         $todayCheckIns = Attendance::query()
             ->where('organization_id', $organizationId)
-            ->whereDate('check_in_at', $today)
+            ->whereDate('check_in_at', today())
             ->count();
 
         /*
@@ -47,11 +42,10 @@ class DashboardController extends Controller
          */
         $expiringMemberships = Membership::query()
             ->where('organization_id', $organizationId)
-            ->where('status', 'active')
-            ->whereDate('start_date', '<=', $today)
+            ->currentlyActive()
             ->whereBetween('end_date', [
-                $today,
-                $today->copy()->addDays(7),
+                today(),
+                today()->addDays(7),
             ])
             ->count();
 
@@ -64,13 +58,11 @@ class DashboardController extends Controller
             ->count();
 
         /*
-         * Outstanding balance across active memberships.
+         * Outstanding balance across currently active memberships.
          */
         $outstandingBalance = Membership::query()
             ->where('organization_id', $organizationId)
-            ->where('status', 'active')
-            ->whereDate('start_date', '<=', $today)
-            ->whereDate('end_date', '>=', $today)
+            ->currentlyActive()
             ->with('payments')
             ->get()
             ->sum(function (Membership $membership) {
@@ -79,15 +71,40 @@ class DashboardController extends Controller
 
         /*
          * Latest open signals for the dashboard.
+         *
+         * Priority order:
+         *   1. High severity
+         *   2. Medium severity
+         *   3. Low severity
+         *
+         * Within the same severity, newest signals appear first.
+         *
+         * We also load interventions so the dashboard can show
+         * the latest action already taken by staff.
          */
         $signals = Signal::query()
             ->where('organization_id', $organizationId)
             ->where('status', 'open')
-            ->with('member:id,name,phone')
+            ->with([
+                'member:id,name,phone',
+                'interventions' => function ($query) {
+                    $query->latest('intervened_at');
+                },
+            ])
+            ->orderByRaw("
+                CASE severity
+                    WHEN 'high' THEN 1
+                    WHEN 'medium' THEN 2
+                    WHEN 'low' THEN 3
+                    ELSE 4
+                END
+            ")
             ->latest('detected_at')
             ->limit(10)
             ->get()
             ->map(function (Signal $signal) use ($recommendationService) {
+                $latestIntervention = $signal->interventions->first();
+
                 return [
                     'id' => $signal->id,
 
@@ -108,15 +125,39 @@ class DashboardController extends Controller
                     'recommendation' => $recommendationService->recommend(
                         $signal
                     ),
+
+                    /*
+                     * Latest intervention recorded against this signal.
+                     *
+                     * Null means the staff has not recorded an
+                     * intervention yet.
+                     */
+                    'latest_intervention' => $latestIntervention
+                        ? [
+                            'type' => $latestIntervention->type->value,
+
+                            'notes' => $latestIntervention->notes,
+
+                            'outcome' => $latestIntervention->outcome,
+
+                            'intervened_at' => $latestIntervention
+                                ->intervened_at
+                                ->toISOString(),
+                        ]
+                        : null,
                 ];
             });
 
         return Inertia::render('dashboard', [
             'stats' => [
                 'active_members' => $activeMembers,
+
                 'today_check_ins' => $todayCheckIns,
+
                 'expiring_memberships' => $expiringMemberships,
+
                 'open_signals' => $openSignals,
+
                 'outstanding_balance' => round(
                     $outstandingBalance,
                     2

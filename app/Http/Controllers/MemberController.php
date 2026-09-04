@@ -2,8 +2,9 @@
 
 namespace App\Http\Controllers;
 
-use App\Enums\InterventionType;
 use App\Enums\PaymentMethod;
+use App\Enums\SignalDismissalReason;
+use App\Http\Requests\DismissSignalRequest;
 use App\Http\Requests\StoreAttendanceRequest;
 use App\Http\Requests\StoreInterventionRequest;
 use App\Http\Requests\StoreMemberRequest;
@@ -18,6 +19,8 @@ use App\Models\MembershipPlan;
 use App\Models\Signal;
 use App\Services\AttendanceService;
 use App\Services\Intelligence\InterventionService;
+use App\Services\Intelligence\SignalLifecycleService;
+use App\Services\MemberTimelineService;
 use App\Services\MembershipPurchaseService;
 use App\Services\MembershipRenewalService;
 use App\Services\PaymentService;
@@ -26,6 +29,7 @@ use Illuminate\Http\RedirectResponse;
 use Illuminate\Support\Facades\Gate;
 use Inertia\Inertia;
 use Inertia\Response;
+use RuntimeException;
 
 class MemberController extends Controller
 {
@@ -71,8 +75,10 @@ class MemberController extends Controller
             ->route('members.show', $member);
     }
 
-    public function show(Member $member): Response
-    {
+    public function show(
+        Member $member,
+        MemberTimelineService $timelineService,
+    ): Response {
         Gate::authorize('view', $member);
 
         $member->load([
@@ -80,34 +86,51 @@ class MemberController extends Controller
             'memberships.payments',
             'expectations',
             'goals',
-            'signals.interventions',
-            'interventions',
+
+            'signals' => function ($query) {
+                $query
+                    ->with('interventions')
+                    ->latest('detected_at');
+            },
+
+            'interventions' => function ($query) {
+                $query->latest('intervened_at');
+            },
         ]);
 
-        /*
-         * lifecycle_status is a derived attribute on Membership.
-         */
         $member->memberships->each(
-            fn (Membership $membership) => $membership->append(
-                'lifecycle_status'
-            )
+            fn (Membership $membership) => $membership->append([
+                'lifecycle_status',
+                'amount_paid',
+                'balance_due',
+            ])
         );
 
+        /*
+         * Recent attendance for the member page and timeline.
+         */
         $member->setRelation(
             'attendances',
             $member->attendances()
                 ->latest('check_in_at')
-                ->limit(10)
+                ->limit(50)
                 ->get()
         );
 
         $checkedInToday = Attendance::query()
+            ->where('organization_id', $member->organization_id)
             ->where('member_id', $member->id)
             ->whereDate('check_in_at', today())
             ->exists();
 
+        /*
+         * Build the normalized member timeline.
+         */
+        $timeline = $timelineService->build($member);
+
         return Inertia::render('Members/Show', [
             'member' => $member,
+            'timeline' => $timeline,
             'checkedInToday' => $checkedInToday,
         ]);
     }
@@ -115,22 +138,24 @@ class MemberController extends Controller
     public function storeIntervention(
         StoreInterventionRequest $request,
         Member $member,
-        Signal $signal,
         InterventionService $interventionService,
     ): RedirectResponse {
         Gate::authorize('view', $member);
 
-        if ($signal->member_id !== $member->id) {
-            abort(404);
-        }
+        $signal = Signal::query()
+            ->where('organization_id', $member->organization_id)
+            ->where('member_id', $member->id)
+            ->findOrFail(
+                $request->validated('signal_id')
+            );
 
         $interventionService->record(
-            $signal,
-            InterventionType::from(
-                $request->string('type')->toString()
-            ),
-            $request->input('notes'),
-            $request->input('outcome'),
+            signal: $signal,
+            member: $member,
+            type: $request->validated('type'),
+            notes: $request->validated('notes'),
+            outcome: $request->validated('outcome'),
+            intervenedAt: $request->validated('intervened_at'),
         );
 
         return back();
@@ -328,17 +353,26 @@ class MemberController extends Controller
             ->route('members.show', $member);
     }
 
+    /*
+     * Record a member check-in.
+     */
     public function storeAttendance(
-        StoreAttendanceRequest $request,
-        Member $member,
-        AttendanceService $attendanceService,
-    ): RedirectResponse {
-        Gate::authorize('view', $member);
+    StoreAttendanceRequest $request,
+    Member $member,
+    AttendanceService $attendanceService,
+): RedirectResponse {
+    Gate::authorize('view', $member);
 
+    try {
         $attendanceService->checkIn($member);
-
-        return back();
+    } catch (RuntimeException $exception) {
+        return back()->withErrors([
+            'attendance' => $exception->getMessage(),
+        ]);
     }
+
+    return back();
+}
 
     /*
      * Show the renewal form.
@@ -463,5 +497,35 @@ class MemberController extends Controller
 
         return redirect()
             ->route('members.show', $member);
+    }
+
+    /*
+     * Dismiss an open signal.
+     */
+    public function dismissSignal(
+        DismissSignalRequest $request,
+        Member $member,
+        Signal $signal,
+        SignalLifecycleService $lifecycleService,
+    ): RedirectResponse {
+        $organizationId = auth()->user()->organization_id;
+
+        abort_unless(
+            $member->organization_id === $organizationId
+                && $signal->organization_id === $organizationId
+                && $signal->member_id === $member->id,
+            404,
+        );
+
+        $lifecycleService->dismiss(
+            signal: $signal,
+            reason: SignalDismissalReason::from(
+                $request->validated('reason'),
+            ),
+            notes: $request->validated('notes'),
+            dismissedBy: auth()->id(),
+        );
+
+        return back();
     }
 }

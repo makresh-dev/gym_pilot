@@ -8,16 +8,11 @@ class StoreAttendanceRequest extends FormRequest
 {
     public function authorize(): bool
     {
-        return $this->user() !== null;
+        return true;
     }
 
     public function rules(): array
     {
-        return [
-            'check_in_at' => [
-                'required',
-                'date',
-            ],
-        ];
+        return [];
     }
 }

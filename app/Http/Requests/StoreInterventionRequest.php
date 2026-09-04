@@ -10,12 +10,17 @@ class StoreInterventionRequest extends FormRequest
 {
     public function authorize(): bool
     {
-        return $this->user() !== null;
+        return true;
     }
 
     public function rules(): array
     {
         return [
+            'signal_id' => [
+                'required',
+                'string',
+            ],
+
             'type' => [
                 'required',
                 Rule::enum(InterventionType::class),
@@ -24,13 +29,18 @@ class StoreInterventionRequest extends FormRequest
             'notes' => [
                 'nullable',
                 'string',
-                'max:5000',
+                'max:2000',
             ],
 
             'outcome' => [
                 'nullable',
                 'string',
-                'max:5000',
+                'max:2000',
+            ],
+
+            'intervened_at' => [
+                'nullable',
+                'date',
             ],
         ];
     }
