@@ -2,6 +2,8 @@
 
 namespace App\Http\Controllers;
 
+use App\Http\Requests\StoreMembershipPlanRequest;
+use App\Http\Requests\UpdateMembershipPlanRequest;
 use App\Models\MembershipPlan;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -37,31 +39,14 @@ class MembershipPlanController extends Controller
         return Inertia::render('MembershipPlans/Create');
     }
 
-    public function store(Request $request): RedirectResponse
-    {
-        $validated = $request->validate([
-            'name' => [
-                'required',
-                'string',
-                'max:255',
-            ],
-            'price' => [
-                'required',
-                'numeric',
-                'min:0',
-            ],
-            'duration_days' => [
-                'required',
-                'integer',
-                'min:1',
-            ],
-        ]);
-
-        $plan = MembershipPlan::create([
+    public function store(
+        StoreMembershipPlanRequest $request
+    ): RedirectResponse {
+        MembershipPlan::create([
             'organization_id' => $request->user()->organization_id,
-            'name' => $validated['name'],
-            'price' => $validated['price'],
-            'duration_days' => $validated['duration_days'],
+            'name' => $request->validated('name'),
+            'price' => $request->validated('price'),
+            'duration_days' => $request->validated('duration_days'),
             'is_active' => true,
         ]);
 
@@ -69,8 +54,9 @@ class MembershipPlanController extends Controller
             ->route('membership-plans.index');
     }
 
-    public function edit(MembershipPlan $membershipPlan): Response
-    {
+    public function edit(
+        MembershipPlan $membershipPlan
+    ): Response {
         Gate::authorize('view', $membershipPlan);
 
         return Inertia::render('MembershipPlans/Edit', [
@@ -85,46 +71,15 @@ class MembershipPlanController extends Controller
     }
 
     public function update(
-        Request $request,
+        UpdateMembershipPlanRequest $request,
         MembershipPlan $membershipPlan
     ): RedirectResponse {
         Gate::authorize('update', $membershipPlan);
 
-        $validated = $request->validate([
-            'name' => [
-                'required',
-                'string',
-                'max:255',
-            ],
-            'price' => [
-                'required',
-                'numeric',
-                'min:0',
-            ],
-            'duration_days' => [
-                'required',
-                'integer',
-                'min:1',
-            ],
-        ]);
-
         $membershipPlan->update([
-            'name' => $validated['name'],
-            'price' => $validated['price'],
-            'duration_days' => $validated['duration_days'],
-        ]);
-
-        return redirect()
-            ->route('membership-plans.index');
-    }
-
-    public function destroy(
-        MembershipPlan $membershipPlan
-    ): RedirectResponse {
-        Gate::authorize('delete', $membershipPlan);
-
-        $membershipPlan->update([
-            'is_active' => false,
+            'name' => $request->validated('name'),
+            'price' => $request->validated('price'),
+            'duration_days' => $request->validated('duration_days'),
         ]);
 
         return redirect()
@@ -132,15 +87,15 @@ class MembershipPlanController extends Controller
     }
 
     public function toggleStatus(
-    MembershipPlan $membershipPlan
+        MembershipPlan $membershipPlan
     ): RedirectResponse {
-    Gate::authorize('update', $membershipPlan);
+        Gate::authorize('update', $membershipPlan);
 
-    $membershipPlan->update([
-        'is_active' => ! $membershipPlan->is_active,
-    ]);
+        $membershipPlan->update([
+            'is_active' => ! $membershipPlan->is_active,
+        ]);
 
-    return redirect()
-        ->route('membership-plans.index');
+        return redirect()
+            ->route('membership-plans.index');
     }
 }

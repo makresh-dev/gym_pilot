@@ -18,8 +18,8 @@ use App\Models\MembershipPlan;
 use App\Models\Signal;
 use App\Services\AttendanceService;
 use App\Services\Intelligence\InterventionService;
+use App\Services\MembershipPurchaseService;
 use App\Services\MembershipRenewalService;
-use App\Services\MembershipService;
 use App\Services\PaymentService;
 use Carbon\Carbon;
 use Illuminate\Http\RedirectResponse;
@@ -153,7 +153,7 @@ class MemberController extends Controller
 
     public function update(
         UpdateMemberRequest $request,
-        Member $member
+        Member $member,
     ): RedirectResponse {
         Gate::authorize('update', $member);
 
@@ -178,6 +178,9 @@ class MemberController extends Controller
             ->route('members.index');
     }
 
+    /*
+     * Show the create-membership form.
+     */
     public function createMembership(Member $member): Response
     {
         Gate::authorize('view', $member);
@@ -193,39 +196,76 @@ class MemberController extends Controller
                 'duration_days',
             ]);
 
+        $paymentMethods = array_map(
+            fn (PaymentMethod $method) => [
+                'value' => $method->value,
+                'label' => $method->getLabel(),
+            ],
+            PaymentMethod::cases(),
+        );
+
         return Inertia::render('Members/CreateMembership', [
             'member' => [
                 'id' => $member->id,
                 'name' => $member->name,
             ],
+
             'plans' => $plans,
+
+            'payment_methods' => $paymentMethods,
         ]);
     }
 
+    /*
+     * Create a new membership.
+     */
     public function storeMembership(
         StoreMembershipRequest $request,
         Member $member,
-        MembershipService $membershipService
+        MembershipPurchaseService $membershipPurchaseService,
     ): RedirectResponse {
         Gate::authorize('view', $member);
+
+        $validated = $request->validated();
 
         $plan = MembershipPlan::query()
             ->where('organization_id', $member->organization_id)
             ->where('is_active', true)
             ->findOrFail(
-                $request->input('membership_plan_id')
+                $validated['membership_plan_id']
             );
 
-        $membershipService->create(
-            $member,
-            $plan,
-            Carbon::parse($request->input('start_date')),
+        $recordPayment = $request->boolean('payment');
+
+        $paymentMethod = null;
+
+        if ($recordPayment) {
+            $paymentMethod = PaymentMethod::from(
+                $validated['payment_method']
+            );
+        }
+
+        $membershipPurchaseService->create(
+            member: $member,
+            plan: $plan,
+            startDate: Carbon::parse(
+                $validated['start_date']
+            ),
+            recordPayment: $recordPayment,
+            paymentAmount: $validated['payment_amount'] ?? null,
+            paymentMethod: $paymentMethod,
+            paidAt: isset($validated['paid_at'])
+                ? Carbon::parse($validated['paid_at'])
+                : null,
         );
 
         return redirect()
             ->route('members.show', $member);
     }
 
+    /*
+     * Show the record-payment form.
+     */
     public function createPayment(
         Member $member,
         Membership $membership,
@@ -260,11 +300,14 @@ class MemberController extends Controller
         ]);
     }
 
+    /*
+     * Record a payment against an existing membership.
+     */
     public function storePayment(
         StorePaymentRequest $request,
         Member $member,
         Membership $membership,
-        PaymentService $paymentService
+        PaymentService $paymentService,
     ): RedirectResponse {
         Gate::authorize('view', $member);
 
@@ -370,7 +413,7 @@ class MemberController extends Controller
     }
 
     /*
-     * Create the new membership and optionally record payment.
+     * Create the renewed membership and optionally record payment.
      */
     public function renewMembership(
         StoreMembershipRenewalRequest $request,
@@ -384,11 +427,13 @@ class MemberController extends Controller
             abort(404);
         }
 
+        $validated = $request->validated();
+
         $plan = MembershipPlan::query()
             ->where('organization_id', $member->organization_id)
             ->where('is_active', true)
             ->findOrFail(
-                $request->input('membership_plan_id')
+                $validated['membership_plan_id']
             );
 
         $recordPayment = $request->boolean('payment');
@@ -406,7 +451,7 @@ class MemberController extends Controller
             membership: $membership,
             plan: $plan,
             startDate: Carbon::parse(
-                $request->input('start_date')
+                $validated['start_date']
             ),
             recordPayment: $recordPayment,
             paymentAmount: $request->input('payment_amount'),

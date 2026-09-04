@@ -32,41 +32,49 @@ class MembershipService
 
         $endDate = $startDate
             ->copy()
-            ->addDays($plan->duration_days - 1)
-            ->endOfDay();
-
-        $overlappingMembership = $member->memberships()
-            ->whereDate(
-                'start_date',
-                '<=',
-                $endDate->toDateString()
-            )
-            ->whereDate(
-                'end_date',
-                '>=',
-                $startDate->toDateString()
-            )
-            ->exists();
-
-        if ($overlappingMembership) {
-            throw new RuntimeException(
-                'The membership dates overlap with an existing membership.'
-            );
-        }
+            ->addDays($plan->duration_days - 1);
 
         return DB::transaction(function () use (
             $member,
             $plan,
             $startDate,
+            $endDate,
         ) {
+            /*
+             * Lock the member while checking for overlapping memberships.
+             * This prevents two concurrent requests from creating
+             * overlapping memberships for the same member.
+             */
+            Member::query()
+                ->whereKey($member->id)
+                ->lockForUpdate()
+                ->firstOrFail();
+
+            $overlappingMembership = $member->memberships()
+                ->whereDate(
+                    'start_date',
+                    '<=',
+                    $endDate->toDateString()
+                )
+                ->whereDate(
+                    'end_date',
+                    '>=',
+                    $startDate->toDateString()
+                )
+                ->exists();
+
+            if ($overlappingMembership) {
+                throw new RuntimeException(
+                    'The membership dates overlap with an existing membership.'
+                );
+            }
+
             return $member->memberships()->create([
                 'organization_id' => $member->organization_id,
                 'member_id' => $member->id,
                 'membership_plan_id' => $plan->id,
                 'start_date' => $startDate,
-                'end_date' => $startDate
-                    ->copy()
-                    ->addDays($plan->duration_days - 1),
+                'end_date' => $endDate,
                 'price' => $plan->price,
                 'status' => 'active',
             ]);
