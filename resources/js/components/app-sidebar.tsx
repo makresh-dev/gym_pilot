@@ -2,17 +2,16 @@ import { Link } from '@inertiajs/react';
 import {
     BookOpen,
     CalendarCheck2,
+    CreditCard,
     FolderGit2,
     LayoutGrid,
+    Users,
 } from 'lucide-react';
 
 import AppLogo from '@/components/app-logo';
 import { NavFooter } from '@/components/nav-footer';
 import { NavMain } from '@/components/nav-main';
 import { NavUser } from '@/components/nav-user';
-import { CreditCard } from 'lucide-react';
-import membershipPlans from '@/routes/membership-plans';
-
 import {
     Sidebar,
     SidebarContent,
@@ -23,8 +22,10 @@ import {
     SidebarMenuItem,
 } from '@/components/ui/sidebar';
 
-import { dashboard } from '@/routes';
 import attendance from '@/routes/attendance';
+import { dashboard } from '@/routes';
+import membershipPlans from '@/routes/membership-plans';
+import members from '@/routes/members';
 import type { NavItem } from '@/types';
 
 const mainNavItems: NavItem[] = [
@@ -34,11 +35,15 @@ const mainNavItems: NavItem[] = [
         icon: LayoutGrid,
     },
     {
+        title: 'Members',
+        href: members.index(),
+        icon: Users,
+    },
+    {
         title: 'Attendance',
         href: attendance.index(),
         icon: CalendarCheck2,
     },
-
     {
         title: 'Membership Plans',
         href: membershipPlans.index(),

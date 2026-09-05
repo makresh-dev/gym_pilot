@@ -1,5 +1,10 @@
 import { Head, Link, router, useForm } from '@inertiajs/react';
 import { useState, type FormEvent } from 'react';
+import {
+    AlertCircle,
+    CheckCircle2,
+    Clock3,
+} from 'lucide-react';
 import { dashboard } from '@/routes';
 import members from '@/routes/members';
 
@@ -150,8 +155,16 @@ type Member = {
     attendances: Attendance[];
 };
 
+type OperationalStatus = {
+    membership_status: 'active' | 'expiring' | 'expired' | 'none';
+    financial_status: 'paid' | 'outstanding';
+    membership_expires_at: string | null;
+    balance_due: number;
+};
+
 type ShowProps = {
     member: Member;
+    operationalStatus: OperationalStatus;
     checkedInToday: boolean;
     timeline: TimelineEvent[];
 };
@@ -509,8 +522,146 @@ function getTimelineTitle(
     }
 }
 
+function getCalendarDays(month: Date): Date[] {
+    const firstDay = new Date(
+        month.getFullYear(),
+        month.getMonth(),
+        1,
+    );
+
+    const lastDay = new Date(
+        month.getFullYear(),
+        month.getMonth() + 1,
+        0,
+    );
+
+    // Monday-first calendar: Monday = 0, Sunday = 6.
+    const startOffset =
+        (firstDay.getDay() + 6) % 7;
+
+    const totalDays =
+        startOffset + lastDay.getDate();
+
+    const rows = Math.ceil(totalDays / 7);
+    const days: Date[] = [];
+
+    for (let index = 0; index < rows * 7; index++) {
+        days.push(
+            new Date(
+                firstDay.getFullYear(),
+                firstDay.getMonth(),
+                1 - startOffset + index,
+            ),
+        );
+    }
+
+    return days;
+}
+
+function getCalendarDateKey(date: Date): string {
+    const year = date.getFullYear();
+    const month = String(date.getMonth() + 1).padStart(2, '0');
+    const day = String(date.getDate()).padStart(2, '0');
+
+    return `${year}-${month}-${day}`;
+}
+
+function getIndiaDateKey(date: string): string {
+    return new Date(date).toLocaleDateString('en-CA', {
+        timeZone: 'Asia/Kolkata',
+    });
+}
+
+function getCalendarMonthLabel(date: Date): string {
+    return date.toLocaleDateString('en-IN', {
+        month: 'long',
+        year: 'numeric',
+    });
+}
+
+function getSelectedDayLabel(date: string): string {
+    return parseDateOnly(date).toLocaleDateString(
+        'en-IN',
+        {
+            day: 'numeric',
+            month: 'short',
+            year: 'numeric',
+        },
+    );
+}
+
+function MembershipStatusBadge({
+    status,
+}: {
+    status: OperationalStatus['membership_status'];
+}) {
+    const config = {
+        active: {
+            label: 'Active',
+            className:
+                'bg-emerald-50 text-emerald-700 ring-emerald-600/20 dark:bg-emerald-950/40 dark:text-emerald-300',
+            icon: CheckCircle2,
+        },
+        expiring: {
+            label: 'Expiring',
+            className:
+                'bg-amber-50 text-amber-700 ring-amber-600/20 dark:bg-amber-950/40 dark:text-amber-300',
+            icon: Clock3,
+        },
+        expired: {
+            label: 'Expired',
+            className:
+                'bg-red-50 text-red-700 ring-red-600/20 dark:bg-red-950/40 dark:text-red-300',
+            icon: AlertCircle,
+        },
+        none: {
+            label: 'No Membership',
+            className:
+                'bg-muted text-muted-foreground ring-border',
+            icon: AlertCircle,
+        },
+    }[status];
+
+    const Icon = config.icon;
+
+    return (
+        <span
+            className={[
+                'inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-xs font-medium ring-1 ring-inset',
+                config.className,
+            ].join(' ')}
+        >
+            <Icon className="h-3.5 w-3.5" />
+            {config.label}
+        </span>
+    );
+}
+
+function FinancialStatusBadge({
+    status,
+    balanceDue,
+}: {
+    status: OperationalStatus['financial_status'];
+    balanceDue: number;
+}) {
+    if (status === 'paid') {
+        return (
+            <span className="text-sm text-muted-foreground">
+                Paid
+            </span>
+        );
+    }
+
+    return (
+        <span className="text-sm font-medium text-orange-700 dark:text-orange-300">
+            ₹{balanceDue.toLocaleString('en-IN')} outstanding
+        </span>
+    );
+}
+
 export default function Show({
     member,
+    operationalStatus,
     checkedInToday,
     timeline,
 }: ShowProps) {
@@ -533,6 +684,18 @@ export default function Show({
             (membership) =>
                 membership.lifecycle_status === 'active',
         ) ?? null;
+
+    const latestExpiredMembership =
+        member.memberships
+            .filter(
+                (membership) =>
+                    membership.lifecycle_status === 'expired',
+            )
+            .sort(
+                (a, b) =>
+                    new Date(b.end_date).getTime() -
+                    new Date(a.end_date).getTime(),
+            )[0] ?? null;
 
     const upcomingMembership =
         member.memberships.find(
@@ -568,6 +731,52 @@ export default function Show({
         (membership) =>
             membership.lifecycle_status === 'active',
     );
+
+    const latestActivityDate =
+        timeline.length > 0
+            ? timeline[0].occurred_at
+            : new Date().toISOString();
+
+    const [calendarMonth, setCalendarMonth] = useState(
+        (() => {
+            const date = new Date(latestActivityDate);
+
+            return new Date(
+                date.getFullYear(),
+                date.getMonth(),
+                1,
+            );
+        })(),
+    );
+
+    const [selectedActivityDate, setSelectedActivityDate] =
+        useState(
+            getIndiaDateKey(latestActivityDate),
+        );
+
+    const timelineByDate = new Map<
+        string,
+        TimelineEvent[]
+    >();
+
+    for (const event of timeline) {
+        const dateKey = getIndiaDateKey(
+            event.occurred_at,
+        );
+
+        const existing = timelineByDate.get(dateKey);
+
+        if (existing) {
+            existing.push(event);
+        } else {
+            timelineByDate.set(dateKey, [event]);
+        }
+    }
+
+    const selectedActivityEvents =
+        timelineByDate.get(selectedActivityDate) ?? [];
+
+    const calendarDays = getCalendarDays(calendarMonth);
 
     function handleCheckIn(): void {
         if (!hasActiveMembership || checkedInToday || checkingIn) {
@@ -626,6 +835,30 @@ export default function Show({
                         </p>
                     </div>
 
+                    <div className="mt-4 flex flex-wrap items-center gap-3">
+                        <MembershipStatusBadge
+                            status={operationalStatus.membership_status}
+                        />
+
+                        {operationalStatus.membership_expires_at && (
+                            <span className="text-sm text-muted-foreground">
+                                {operationalStatus.membership_status ===
+                                    'expired'
+                                    ? `Expired ${formatDate(
+                                        operationalStatus.membership_expires_at,
+                                    )}`
+                                    : `Ends ${formatDate(
+                                        operationalStatus.membership_expires_at,
+                                    )}`}
+                            </span>
+                        )}
+
+                        <FinancialStatusBadge
+                            status={operationalStatus.financial_status}
+                            balanceDue={operationalStatus.balance_due}
+                        />
+                    </div>
+
                     <div className="mt-4 flex flex-wrap gap-2">
                         <div>
                             <button
@@ -656,14 +889,53 @@ export default function Show({
                             ) : null}
                         </div>
 
-                        <Link
-                            href={members.memberships.create(
-                                member.id,
+                        {operationalStatus.membership_status !== 'active' &&
+                            operationalStatus.membership_status !== 'expiring' && (
+                                <Link
+                                    href={members.memberships.create(
+                                        member.id,
+                                    )}
+                                    className="rounded-md border px-4 py-2 text-sm font-medium"
+                                >
+                                    Add Membership
+                                </Link>
                             )}
-                            className="rounded-md border px-4 py-2 text-sm font-medium"
-                        >
-                            Add Membership
-                        </Link>
+
+                        {currentMembership &&
+                            currentBalance > 0 && (
+                                <Link
+                                    href={
+                                        members
+                                            .memberships
+                                            .payments
+                                            .create([
+                                                member.id,
+                                                currentMembership.id,
+                                            ])
+                                    }
+                                    className="rounded-md border px-4 py-2 text-sm font-medium"
+                                >
+                                    Record Payment
+                                </Link>
+                            )}
+
+                        {operationalStatus.membership_status !== 'none' &&
+                            operationalStatus.membership_status !== 'active' && (
+                                <Link
+                                    href={
+                                        currentMembership
+                                            ? `/members/${member.id}/memberships/${currentMembership.id}/renew`
+                                            : latestExpiredMembership
+                                                ? `/members/${member.id}/memberships/${latestExpiredMembership.id}/renew`
+                                                : members.memberships.create(
+                                                    member.id,
+                                                )
+                                    }
+                                    className="rounded-md border px-4 py-2 text-sm font-medium"
+                                >
+                                    Renew
+                                </Link>
+                            )}
 
                         <Link
                             href={members.edit(member.id)}
@@ -772,121 +1044,336 @@ export default function Show({
                         </div>
                     </section>
 
-                    {/* Unified Timeline */}
-                    <section className="rounded-lg border p-5 md:col-span-2">
-                        <div>
-                            <h2 className="text-lg font-semibold">
-                                Timeline
-                            </h2>
-
-                            <p className="mt-1 text-sm text-muted-foreground">
-                                Everything that has happened with this
-                                member.
-                            </p>
-                        </div>
-
-                        <div className="mt-6">
-                            {timeline.length === 0 ? (
-                                <div className="rounded-lg border border-dashed p-6 text-center">
-                                    <p className="font-medium">
-                                        No activity recorded yet.
-                                    </p>
+                    {/* Operational Attention */}
+                    {(openSignals.length > 0 ||
+                        operationalStatus.financial_status === 'outstanding' ||
+                        operationalStatus.membership_status === 'expiring' ||
+                        operationalStatus.membership_status === 'expired' ||
+                        operationalStatus.membership_status === 'none') && (
+                            <section className="rounded-lg border p-5 md:col-span-2">
+                                <div>
+                                    <h2 className="text-lg font-semibold">
+                                        Attention
+                                    </h2>
 
                                     <p className="mt-1 text-sm text-muted-foreground">
-                                        Memberships, payments,
-                                        attendance, signals, and
-                                        interventions will appear here.
+                                        Items that may need action for this member.
                                     </p>
                                 </div>
-                            ) : (
-                                <div className="space-y-8">
-                                    {groupTimelineByDay(
-                                        timeline,
-                                    ).map((group) => (
-                                        <div key={group.date}>
-                                            <div className="mb-4 flex items-center gap-3">
-                                                <h3 className="text-sm font-semibold">
-                                                    {getTimelineDayLabel(
-                                                        group.date,
-                                                    )}
-                                                </h3>
 
-                                                <div className="h-px flex-1 bg-border" />
-                                            </div>
-
-                                            <div className="relative space-y-5 pl-1">
-                                                {group.events.map(
-                                                    (event) => (
-                                                        <TimelineEvent
-                                                            key={
-                                                                event.id
-                                                            }
-                                                            event={
-                                                                event
-                                                            }
-                                                        />
-                                                    ),
-                                                )}
-                                            </div>
-                                        </div>
-                                    ))}
-                                </div>
-                            )}
-                        </div>
-                    </section>
-
-                    {/* Attendance */}
-                    <section className="rounded-lg border p-5">
-                        <div className="flex items-center justify-between gap-4">
-                            <div>
-                                <h2 className="text-lg font-semibold">
-                                    Recent Attendance
-                                </h2>
-
-                                <p className="mt-1 text-sm text-muted-foreground">
-                                    Latest member check-ins.
-                                </p>
-                            </div>
-
-                            <span className="text-sm text-muted-foreground">
-                                {member.attendances.length}{' '}
-                                recent
-                            </span>
-                        </div>
-
-                        <div className="mt-4 space-y-3">
-                            {member.attendances.length ===
-                                0 ? (
-                                <p className="text-sm text-muted-foreground">
-                                    No attendance records.
-                                </p>
-                            ) : (
-                                member.attendances.map(
-                                    (attendance) => (
-                                        <div
-                                            key={
-                                                attendance.id
-                                            }
-                                            className="flex items-center justify-between border-b pb-3 last:border-0"
-                                        >
-                                            <div>
+                                <div className="mt-4 grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+                                    {operationalStatus.membership_status ===
+                                        'expiring' && (
+                                            <div className="rounded-lg border bg-muted/20 p-4">
                                                 <p className="text-sm font-medium">
-                                                    {formatDateTime(
-                                                        attendance.check_in_at,
+                                                    Membership is expiring
+                                                </p>
+
+                                                <p className="mt-1 text-sm text-muted-foreground">
+                                                    Ends{' '}
+                                                    {formatDate(
+                                                        operationalStatus.membership_expires_at!,
                                                     )}
                                                 </p>
                                             </div>
+                                        )}
 
-                                            <span className="text-xs capitalize text-muted-foreground">
-                                                {
-                                                    attendance.source
-                                                }
-                                            </span>
+                                    {operationalStatus.membership_status ===
+                                        'expired' && (
+                                            <div className="rounded-lg border bg-muted/20 p-4">
+                                                <p className="text-sm font-medium">
+                                                    Membership has expired
+                                                </p>
+
+                                                <p className="mt-1 text-sm text-muted-foreground">
+                                                    Latest membership expired{' '}
+                                                    {formatDate(
+                                                        operationalStatus.membership_expires_at!,
+                                                    )}
+                                                </p>
+                                            </div>
+                                        )}
+
+                                    {operationalStatus.membership_status ===
+                                        'none' && (
+                                            <div className="rounded-lg border bg-muted/20 p-4">
+                                                <p className="text-sm font-medium">
+                                                    No active membership
+                                                </p>
+
+                                                <p className="mt-1 text-sm text-muted-foreground">
+                                                    Add a membership to restore access.
+                                                </p>
+                                            </div>
+                                        )}
+
+                                    {operationalStatus.financial_status ===
+                                        'outstanding' && (
+                                            <div className="rounded-lg border bg-muted/20 p-4">
+                                                <p className="text-sm font-medium">
+                                                    Outstanding balance
+                                                </p>
+
+                                                <p className="mt-1 text-sm text-muted-foreground">
+                                                    {formatCurrency(
+                                                        operationalStatus.balance_due,
+                                                    )}{' '}
+                                                    needs to be collected.
+                                                </p>
+                                            </div>
+                                        )}
+
+                                    {openSignals.length > 0 && (
+                                        <div className="rounded-lg border bg-muted/20 p-4">
+                                            <p className="text-sm font-medium">
+                                                {openSignals.length}{' '}
+                                                {openSignals.length === 1
+                                                    ? 'open signal'
+                                                    : 'open signals'}
+                                            </p>
+
+                                            <p className="mt-1 text-sm text-muted-foreground">
+                                                Review the signal history below and
+                                                record the intervention.
+                                            </p>
                                         </div>
-                                    ),
-                                )
+                                    )}
+                                </div>
+                            </section>
+                        )}
+
+                    {/* Activity */}
+                    <section className="rounded-lg border p-5 md:col-span-2">
+                        <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
+                            <div>
+                                <h2 className="text-lg font-semibold">
+                                    Activity
+                                </h2>
+
+                                <p className="mt-1 text-sm text-muted-foreground">
+                                    Attendance and member activity in one place.
+                                </p>
+                            </div>
+
+                            <div className="flex items-center gap-2">
+                                <button
+                                    type="button"
+                                    onClick={() =>
+                                        setCalendarMonth(
+                                            new Date(
+                                                calendarMonth.getFullYear(),
+                                                calendarMonth.getMonth() - 1,
+                                                1,
+                                            ),
+                                        )
+                                    }
+                                    className="inline-flex h-9 w-9 items-center justify-center rounded-md border text-sm hover:bg-muted"
+                                    aria-label="Previous month"
+                                >
+                                    ←
+                                </button>
+
+                                <div className="min-w-36 text-center text-sm font-medium">
+                                    {getCalendarMonthLabel(
+                                        calendarMonth,
+                                    )}
+                                </div>
+
+                                <button
+                                    type="button"
+                                    onClick={() =>
+                                        setCalendarMonth(
+                                            new Date(
+                                                calendarMonth.getFullYear(),
+                                                calendarMonth.getMonth() + 1,
+                                                1,
+                                            ),
+                                        )
+                                    }
+                                    className="inline-flex h-9 w-9 items-center justify-center rounded-md border text-sm hover:bg-muted"
+                                    aria-label="Next month"
+                                >
+                                    →
+                                </button>
+                            </div>
+                        </div>
+
+                        <div className="mt-5 overflow-hidden rounded-lg border">
+                            <div className="grid grid-cols-7 border-b bg-muted/30">
+                                {[
+                                    'Mon',
+                                    'Tue',
+                                    'Wed',
+                                    'Thu',
+                                    'Fri',
+                                    'Sat',
+                                    'Sun',
+                                ].map((day) => (
+                                    <div
+                                        key={day}
+                                        className="px-1 py-2 text-center text-xs font-medium text-muted-foreground"
+                                    >
+                                        {day}
+                                    </div>
+                                ))}
+                            </div>
+
+                            <div className="grid grid-cols-7">
+                                {calendarDays.map((day) => {
+                                    const dateKey =
+                                        getCalendarDateKey(day);
+
+                                    const dayEvents =
+                                        timelineByDate.get(dateKey) ?? [];
+
+                                    const attendanceCount =
+                                        dayEvents.filter(
+                                            (event) =>
+                                                event.type ===
+                                                'attendance_recorded',
+                                        ).length;
+
+                                    const hasActivity =
+                                        dayEvents.length > 0;
+
+                                    const isCurrentMonth =
+                                        day.getMonth() ===
+                                        calendarMonth.getMonth() &&
+                                        day.getFullYear() ===
+                                        calendarMonth.getFullYear();
+
+                                    const isSelected =
+                                        selectedActivityDate ===
+                                        dateKey;
+
+                                    const todayKey =
+                                        getIndiaDateKey(
+                                            new Date().toISOString(),
+                                        );
+
+                                    const isToday =
+                                        dateKey === todayKey;
+
+                                    return (
+                                        <button
+                                            key={dateKey}
+                                            type="button"
+                                            onClick={() =>
+                                                setSelectedActivityDate(
+                                                    dateKey,
+                                                )
+                                            }
+                                            className={`relative min-h-14 border-b border-r p-1 text-left transition sm:min-h-16 sm:p-2 ${isCurrentMonth
+                                                ? 'bg-background'
+                                                : 'bg-muted/10 text-muted-foreground'
+                                                } ${isSelected
+                                                    ? 'ring-2 ring-inset ring-primary'
+                                                    : 'hover:bg-muted/40'
+                                                }`}
+                                        >
+                                            <div className="flex items-start justify-between gap-1">
+                                                <span
+                                                    className={`flex h-6 w-6 items-center justify-center rounded-full text-xs font-medium ${isToday
+                                                        ? 'bg-primary text-primary-foreground'
+                                                        : ''
+                                                        }`}
+                                                >
+                                                    {day.getDate()}
+                                                </span>
+
+                                                {attendanceCount > 0 && (
+                                                    <span className="rounded-full bg-muted px-1.5 py-0.5 text-[10px] font-medium">
+                                                        {attendanceCount}
+                                                    </span>
+                                                )}
+                                            </div>
+
+                                            {hasActivity && (
+                                                <div className="mt-2 flex items-center gap-1">
+                                                    <span className="h-1.5 w-1.5 rounded-full bg-foreground" />
+
+                                                    {dayEvents.length > 1 && (
+                                                        <span className="text-[10px] text-muted-foreground">
+                                                            {dayEvents.length} events
+                                                        </span>
+                                                    )}
+                                                </div>
+                                            )}
+                                        </button>
+                                    );
+                                })}
+                            </div>
+                        </div>
+
+                        <div className="mt-5">
+                            <div className="flex items-center justify-between gap-4">
+                                <div>
+                                    <p className="text-sm font-medium">
+                                        {getSelectedDayLabel(
+                                            selectedActivityDate,
+                                        )}
+                                    </p>
+
+                                    <p className="mt-1 text-xs text-muted-foreground">
+                                        {selectedActivityEvents.length === 0
+                                            ? 'No activity recorded'
+                                            : `${selectedActivityEvents.length} ${selectedActivityEvents.length === 1 ? 'event' : 'events'}`}
+                                    </p>
+                                </div>
+
+                                <button
+                                    type="button"
+                                    onClick={() => {
+                                        const todayKey =
+                                            getIndiaDateKey(
+                                                new Date().toISOString(),
+                                            );
+
+                                        const today =
+                                            parseDateOnly(todayKey);
+
+                                        setCalendarMonth(
+                                            new Date(
+                                                today.getFullYear(),
+                                                today.getMonth(),
+                                                1,
+                                            ),
+                                        );
+
+                                        setSelectedActivityDate(
+                                            todayKey,
+                                        );
+                                    }}
+                                    className="rounded-md border px-3 py-1.5 text-xs font-medium hover:bg-muted"
+                                >
+                                    Today
+                                </button>
+                            </div>
+
+                            {selectedActivityEvents.length === 0 ? (
+                                <div className="mt-3 rounded-lg border border-dashed p-5 text-center">
+                                    <p className="text-sm text-muted-foreground">
+                                        No activity recorded for this day.
+                                    </p>
+                                </div>
+                            ) : (
+                                <div className="mt-3 space-y-3">
+                                    {selectedActivityEvents.map(
+                                        (event) => (
+                                            <TimelineEvent
+                                                key={event.id}
+                                                event={event}
+                                                compact
+                                            />
+                                        ),
+                                    )}
+                                </div>
                             )}
                         </div>
+
+                        <p className="mt-4 text-xs text-muted-foreground">
+                            Calendar shows activity from the loaded member history.
+                        </p>
                     </section>
 
                     {/* Current Membership */}
@@ -1425,11 +1912,16 @@ export default function Show({
 
 function TimelineEvent({
     event,
+    compact = false,
 }: {
     event: TimelineEvent;
+    compact?: boolean;
 }) {
     return (
-        <div className="relative flex gap-4">
+        <div
+            className={`relative flex gap-3 ${compact ? 'rounded-lg border bg-muted/20 p-3' : ''
+                }`}
+        >
             <div className="relative mt-1.5 flex w-3 shrink-0 justify-center">
                 <div className="h-2.5 w-2.5 rounded-full bg-foreground" />
             </div>

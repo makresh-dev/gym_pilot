@@ -26,6 +26,7 @@ use App\Services\MembershipRenewalService;
 use App\Services\PaymentService;
 use Carbon\Carbon;
 use Illuminate\Http\RedirectResponse;
+use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Gate;
 use Inertia\Inertia;
 use Inertia\Response;
@@ -33,24 +34,296 @@ use RuntimeException;
 
 class MemberController extends Controller
 {
-    public function index(): Response
+    public function index(Request $request): Response
     {
-        $user = auth()->user();
+        $user = $request->user();
+
+        $search = trim(
+            $request->string('search')->toString()
+        );
+
+        $membershipStatus = $request
+            ->string('membership_status')
+            ->toString();
+
+        if (! in_array(
+            $membershipStatus,
+            ['active', 'expiring', 'expired', 'none'],
+            true
+        )) {
+            $membershipStatus = '';
+        }
+
+        $financialStatus = $request
+            ->string('financial_status')
+            ->toString();
+
+        if (! in_array(
+            $financialStatus,
+            ['paid', 'outstanding'],
+            true
+        )) {
+            $financialStatus = '';
+        }
+
+        $today = Carbon::today();
+        $expiringCutoff = $today->copy()->addDays(7);
+
+        $hasActiveMembership = function ($query) use ($today) {
+            $query
+                ->where('status', 'active')
+                ->whereDate('start_date', '<=', $today)
+                ->whereDate('end_date', '>=', $today);
+        };
+
+        $hasOutstandingMembership = function ($query) {
+            $query->whereRaw(
+                'memberships.price > (
+                    SELECT COALESCE(SUM(payments.amount), 0)
+                    FROM payments
+                    WHERE payments.membership_id = memberships.id
+                )'
+            );
+        };
 
         $members = Member::query()
-            ->where('organization_id', $user->organization_id)
+            ->where(
+                'organization_id',
+                $user->organization_id
+            )
+            ->with([
+                'memberships' => function ($query) {
+                    $query
+                        ->with('payments')
+                        ->orderByDesc('start_date')
+                        ->orderByDesc('end_date');
+                },
+            ])
+            ->when(
+                $search !== '',
+                function ($query) use ($search) {
+                    $query->where(function ($query) use ($search) {
+                        $query
+                            ->where(
+                                'name',
+                                'ilike',
+                                "%{$search}%"
+                            )
+                            ->orWhere(
+                                'phone',
+                                'ilike',
+                                "%{$search}%"
+                            )
+                            ->orWhere(
+                                'email',
+                                'ilike',
+                                "%{$search}%"
+                            );
+                    });
+                }
+            )
+            ->when(
+                $membershipStatus === 'active',
+                function ($query) use ($today, $expiringCutoff) {
+                    $query->whereHas(
+                        'memberships',
+                        function ($query) use (
+                            $today,
+                            $expiringCutoff,
+                        ) {
+                            $query
+                                ->where('status', 'active')
+                                ->whereDate(
+                                    'start_date',
+                                    '<=',
+                                    $today
+                                )
+                                ->whereDate(
+                                    'end_date',
+                                    '>=',
+                                    $today
+                                )
+                                ->whereDate(
+                                    'end_date',
+                                    '>',
+                                    $expiringCutoff
+                                );
+                        }
+                    );
+                }
+            )
+            ->when(
+                $membershipStatus === 'expiring',
+                function ($query) use ($today, $expiringCutoff) {
+                    $query->whereHas(
+                        'memberships',
+                        function ($query) use (
+                            $today,
+                            $expiringCutoff,
+                        ) {
+                            $query
+                                ->where('status', 'active')
+                                ->whereDate(
+                                    'start_date',
+                                    '<=',
+                                    $today
+                                )
+                                ->whereDate(
+                                    'end_date',
+                                    '>=',
+                                    $today
+                                )
+                                ->whereDate(
+                                    'end_date',
+                                    '<=',
+                                    $expiringCutoff
+                                );
+                        }
+                    );
+                }
+            )
+            ->when(
+                $membershipStatus === 'expired',
+                function ($query) use (
+                    $hasActiveMembership,
+                    $today,
+                ) {
+                    $query
+                        ->whereDoesntHave(
+                            'memberships',
+                            $hasActiveMembership
+                        )
+                        ->whereHas(
+                            'memberships',
+                            function ($query) use ($today) {
+                                $query->whereDate(
+                                    'end_date',
+                                    '<',
+                                    $today
+                                );
+                            }
+                        );
+                }
+            )
+            ->when(
+                $membershipStatus === 'none',
+                function ($query) use (
+                    $hasActiveMembership,
+                    $today,
+                ) {
+                    $query
+                        ->whereDoesntHave(
+                            'memberships',
+                            $hasActiveMembership
+                        )
+                        ->whereDoesntHave(
+                            'memberships',
+                            function ($query) use ($today) {
+                                $query->whereDate(
+                                    'end_date',
+                                    '<',
+                                    $today
+                                );
+                            }
+                        );
+                }
+            )
+            ->when(
+                $financialStatus === 'outstanding',
+                function ($query) use ($hasOutstandingMembership) {
+                    $query->whereHas(
+                        'memberships',
+                        $hasOutstandingMembership
+                    );
+                }
+            )
+            ->when(
+                $financialStatus === 'paid',
+                function ($query) use ($hasOutstandingMembership) {
+                    $query->whereDoesntHave(
+                        'memberships',
+                        $hasOutstandingMembership
+                    );
+                }
+            )
             ->latest()
             ->paginate(20)
-            ->through(fn (Member $member) => [
-                'id' => $member->id,
-                'name' => $member->name,
-                'email' => $member->email,
-                'phone' => $member->phone,
-                'date_of_birth' => $member->date_of_birth?->toDateString(),
-            ]);
+            ->withQueryString()
+            ->through(
+                function (Member $member) use (
+                    $today,
+                    $expiringCutoff,
+                ) {
+                    $activeMembership = $member->memberships
+                        ->filter(
+                            fn (Membership $membership) =>
+                                $membership->isActive($today)
+                        )
+                        ->sortBy('end_date')
+                        ->first();
+
+                    $latestExpiredMembership = $member->memberships
+                        ->filter(
+                            fn (Membership $membership) =>
+                                $membership->isExpired($today)
+                        )
+                        ->sortByDesc('end_date')
+                        ->first();
+
+                    if ($activeMembership) {
+                        $memberStatus =
+                            $activeMembership->end_date->lte(
+                                $expiringCutoff
+                            )
+                                ? 'expiring'
+                                : 'active';
+
+                        $membershipExpiresAt = $activeMembership
+                            ->end_date
+                            ->toDateString();
+                    } elseif ($latestExpiredMembership) {
+                        $memberStatus = 'expired';
+
+                        $membershipExpiresAt = $latestExpiredMembership
+                            ->end_date
+                            ->toDateString();
+                    } else {
+                        $memberStatus = 'none';
+                        $membershipExpiresAt = null;
+                    }
+
+                    $totalBalanceDue = $member->memberships->sum(
+                        fn (Membership $membership) =>
+                            $membership->balanceDue()
+                    );
+
+                    return [
+                        'id' => $member->id,
+                        'name' => $member->name,
+                        'email' => $member->email,
+                        'phone' => $member->phone,
+                        'date_of_birth' =>
+                            $member->date_of_birth?->toDateString(),
+
+                        'membership_status' => $memberStatus,
+                        'financial_status' => $totalBalanceDue > 0
+                            ? 'outstanding'
+                            : 'paid',
+                        'membership_expires_at' =>
+                            $membershipExpiresAt,
+                        'balance_due' => round(
+                            $totalBalanceDue,
+                            2
+                        ),
+                    ];
+                }
+            );
 
         return Inertia::render('Members/Index', [
             'members' => $members,
+            'search' => $search,
+            'membership_status' => $membershipStatus,
+            'financial_status' => $financialStatus,
         ]);
     }
 
@@ -106,9 +379,59 @@ class MemberController extends Controller
             ])
         );
 
-        /*
-         * Recent attendance for the member page and timeline.
-         */
+        $today = Carbon::today();
+        $expiringCutoff = $today->copy()->addDays(7);
+
+        $currentMembership = $member->memberships
+            ->filter(
+                fn (Membership $membership) =>
+                    $membership->isActive($today)
+            )
+            ->sortBy('end_date')
+            ->first();
+
+        $latestExpiredMembership = $member->memberships
+            ->filter(
+                fn (Membership $membership) =>
+                    $membership->isExpired($today)
+            )
+            ->sortByDesc('end_date')
+            ->first();
+
+        if ($currentMembership) {
+            $membershipStatus = $currentMembership->end_date->lte(
+                $expiringCutoff
+            )
+                ? 'expiring'
+                : 'active';
+
+            $membershipExpiresAt = $currentMembership
+                ->end_date
+                ->toDateString();
+        } elseif ($latestExpiredMembership) {
+            $membershipStatus = 'expired';
+            $membershipExpiresAt = $latestExpiredMembership
+                ->end_date
+                ->toDateString();
+        } else {
+            $membershipStatus = 'none';
+            $membershipExpiresAt = null;
+        }
+
+        $totalBalanceDue = $member->memberships->sum(
+            fn (Membership $membership) =>
+                $membership->balanceDue()
+        );
+
+        $operationalStatus = [
+            'membership_status' => $membershipStatus,
+            'financial_status' => $totalBalanceDue > 0
+                ? 'outstanding'
+                : 'paid',
+            'membership_expires_at' => $membershipExpiresAt,
+            'balance_due' => round($totalBalanceDue, 2),
+        ];
+
         $member->setRelation(
             'attendances',
             $member->attendances()
@@ -123,13 +446,11 @@ class MemberController extends Controller
             ->whereDate('check_in_at', today())
             ->exists();
 
-        /*
-         * Build the normalized member timeline.
-         */
         $timeline = $timelineService->build($member);
 
         return Inertia::render('Members/Show', [
             'member' => $member,
+            'operationalStatus' => $operationalStatus,
             'timeline' => $timeline,
             'checkedInToday' => $checkedInToday,
         ]);
@@ -203,9 +524,6 @@ class MemberController extends Controller
             ->route('members.index');
     }
 
-    /*
-     * Show the create-membership form.
-     */
     public function createMembership(Member $member): Response
     {
         Gate::authorize('view', $member);
@@ -234,16 +552,11 @@ class MemberController extends Controller
                 'id' => $member->id,
                 'name' => $member->name,
             ],
-
             'plans' => $plans,
-
             'payment_methods' => $paymentMethods,
         ]);
     }
 
-    /*
-     * Create a new membership.
-     */
     public function storeMembership(
         StoreMembershipRequest $request,
         Member $member,
@@ -261,7 +574,6 @@ class MemberController extends Controller
             );
 
         $recordPayment = $request->boolean('payment');
-
         $paymentMethod = null;
 
         if ($recordPayment) {
@@ -288,9 +600,6 @@ class MemberController extends Controller
             ->route('members.show', $member);
     }
 
-    /*
-     * Show the record-payment form.
-     */
     public function createPayment(
         Member $member,
         Membership $membership,
@@ -314,20 +623,15 @@ class MemberController extends Controller
                 'id' => $member->id,
                 'name' => $member->name,
             ],
-
             'membership' => [
                 'id' => $membership->id,
                 'status' => $membership->status,
                 'balance_due' => $membership->balanceDue(),
             ],
-
             'payment_methods' => $methods,
         ]);
     }
 
-    /*
-     * Record a payment against an existing membership.
-     */
     public function storePayment(
         StorePaymentRequest $request,
         Member $member,
@@ -353,30 +657,24 @@ class MemberController extends Controller
             ->route('members.show', $member);
     }
 
-    /*
-     * Record a member check-in.
-     */
     public function storeAttendance(
-    StoreAttendanceRequest $request,
-    Member $member,
-    AttendanceService $attendanceService,
-): RedirectResponse {
-    Gate::authorize('view', $member);
+        StoreAttendanceRequest $request,
+        Member $member,
+        AttendanceService $attendanceService,
+    ): RedirectResponse {
+        Gate::authorize('view', $member);
 
-    try {
-        $attendanceService->checkIn($member);
-    } catch (RuntimeException $exception) {
-        return back()->withErrors([
-            'attendance' => $exception->getMessage(),
-        ]);
+        try {
+            $attendanceService->checkIn($member);
+        } catch (RuntimeException $exception) {
+            return back()->withErrors([
+                'attendance' => $exception->getMessage(),
+            ]);
+        }
+
+        return back();
     }
 
-    return back();
-}
-
-    /*
-     * Show the renewal form.
-     */
     public function createRenewal(
         Member $member,
         Membership $membership,
@@ -402,13 +700,6 @@ class MemberController extends Controller
 
         $today = Carbon::today();
 
-        /*
-         * Active membership:
-         * renewal starts the day after the current membership ends.
-         *
-         * Expired membership:
-         * renewal starts today.
-         */
         $suggestedStartDate = $membership->end_date->gte($today)
             ? $membership->end_date->copy()->addDay()
             : $today;
@@ -426,7 +717,6 @@ class MemberController extends Controller
                 'id' => $member->id,
                 'name' => $member->name,
             ],
-
             'membership' => [
                 'id' => $membership->id,
                 'start_date' => $membership->start_date,
@@ -437,18 +727,12 @@ class MemberController extends Controller
                     'name' => $membership->membershipPlan->name,
                 ],
             ],
-
             'plans' => $plans,
-
             'payment_methods' => $paymentMethods,
-
             'suggested_start_date' => $suggestedStartDate->toDateString(),
         ]);
     }
 
-    /*
-     * Create the renewed membership and optionally record payment.
-     */
     public function renewMembership(
         StoreMembershipRenewalRequest $request,
         Member $member,
@@ -471,7 +755,6 @@ class MemberController extends Controller
             );
 
         $recordPayment = $request->boolean('payment');
-
         $paymentMethod = null;
 
         if ($recordPayment) {
@@ -499,9 +782,6 @@ class MemberController extends Controller
             ->route('members.show', $member);
     }
 
-    /*
-     * Dismiss an open signal.
-     */
     public function dismissSignal(
         DismissSignalRequest $request,
         Member $member,
