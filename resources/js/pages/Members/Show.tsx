@@ -52,6 +52,12 @@ type Intervention = {
     notes: string | null;
     outcome: string | null;
     intervened_at: string;
+    signal_type: string | null;
+    signal_severity: string | null;
+    attendance_before_14d: number | null;
+    attendance_after_14d: number | null;
+    attendance_change: number | null;
+    follow_up_status: 'ready' | 'in_progress' | 'unavailable';
 };
 
 type SignalIntervention = {
@@ -204,13 +210,8 @@ function formatCurrency(amount: number): string {
 }
 
 function getDurationDays(membership: Membership): number {
-    const start = new Date(
-        `${membership.start_date}T00:00:00`,
-    );
-
-    const end = new Date(
-        `${membership.end_date}T00:00:00`,
-    );
+    const start = parseDateOnly(membership.start_date);
+    const end = parseDateOnly(membership.end_date);
 
     const difference =
         Math.round(
@@ -659,6 +660,100 @@ function FinancialStatusBadge({
     );
 }
 
+type AttendanceSnapshot = {
+    recentVisits: number;
+    previousVisits: number;
+    expectedVisitsPerWeek: number | null;
+    trend: 'improving' | 'declining' | 'stable' | 'insufficient_data';
+    lastVisit: string | null;
+};
+
+function getAttendanceSnapshot(
+    attendances: Attendance[],
+    expectedVisitsPerWeek: number | null,
+): AttendanceSnapshot {
+    const todayKey = new Date().toLocaleDateString('en-CA', {
+        timeZone: 'Asia/Kolkata',
+    });
+
+    const today = parseDateOnly(todayKey);
+    const recentStart = new Date(today);
+    recentStart.setDate(recentStart.getDate() - 13);
+
+    const previousStart = new Date(today);
+    previousStart.setDate(previousStart.getDate() - 27);
+
+    const previousEnd = new Date(today);
+    previousEnd.setDate(previousEnd.getDate() - 14);
+
+    const recentVisits = attendances.filter((attendance) => {
+        const date = parseDateOnly(attendance.check_in_at);
+        return date >= recentStart && date <= today;
+    }).length;
+
+    const previousVisits = attendances.filter((attendance) => {
+        const date = parseDateOnly(attendance.check_in_at);
+        return date >= previousStart && date <= previousEnd;
+    }).length;
+
+    let trend: AttendanceSnapshot['trend'] = 'insufficient_data';
+
+    if (previousVisits > 0 || recentVisits > 0) {
+        if (recentVisits > previousVisits) {
+            trend = 'improving';
+        } else if (recentVisits < previousVisits) {
+            trend = 'declining';
+        } else {
+            trend = 'stable';
+        }
+    }
+
+    const lastVisit = attendances.length > 0
+        ? attendances
+            .slice()
+            .sort(
+                (a, b) =>
+                    new Date(b.check_in_at).getTime() -
+                    new Date(a.check_in_at).getTime(),
+            )[0]?.check_in_at ?? null
+        : null;
+
+    return {
+        recentVisits,
+        previousVisits,
+        expectedVisitsPerWeek,
+        trend,
+        lastVisit,
+    };
+}
+
+function getAttendanceTrendPresentation(
+    trend: AttendanceSnapshot['trend'],
+): { label: string; className: string } {
+    switch (trend) {
+        case 'improving':
+            return {
+                label: 'Improving',
+                className: 'text-emerald-600 dark:text-emerald-400',
+            };
+        case 'declining':
+            return {
+                label: 'Declining',
+                className: 'text-destructive',
+            };
+        case 'stable':
+            return {
+                label: 'Stable',
+                className: 'text-muted-foreground',
+            };
+        default:
+            return {
+                label: 'Not enough data',
+                className: 'text-muted-foreground',
+            };
+    }
+}
+
 export default function Show({
     member,
     operationalStatus,
@@ -674,6 +769,15 @@ export default function Show({
         member.goals.find(
             (goal) => goal.end_date === null,
         ) ?? null;
+
+    const attendanceSnapshot = getAttendanceSnapshot(
+        member.attendances,
+        currentExpectation?.visits_per_week ?? null,
+    );
+
+    const attendanceTrend = getAttendanceTrendPresentation(
+        attendanceSnapshot.trend,
+    );
 
     const openSignals = member.signals.filter(
         (signal) => signal.status === 'open',
@@ -1141,6 +1245,78 @@ export default function Show({
                                 </div>
                             </section>
                         )}
+
+                    {/* Engagement Snapshot */}
+                    <section className="rounded-lg border p-5 md:col-span-2">
+                        <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
+                            <div>
+                                <h2 className="text-lg font-semibold">
+                                    Engagement Snapshot
+                                </h2>
+                                <p className="mt-1 text-sm text-muted-foreground">
+                                    Recent attendance context to support retention decisions.
+                                </p>
+                            </div>
+                            <p className={`text-sm font-medium ${attendanceTrend.className}`}>
+                                {attendanceTrend.label}
+                            </p>
+                        </div>
+
+                        <div className="mt-5 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+                            <div className="rounded-lg border bg-muted/20 p-4">
+                                <p className="text-xs text-muted-foreground">
+                                    Last 14 days
+                                </p>
+                                <p className="mt-1 text-xl font-semibold">
+                                    {attendanceSnapshot.recentVisits} visits
+                                </p>
+                            </div>
+
+                            <div className="rounded-lg border bg-muted/20 p-4">
+                                <p className="text-xs text-muted-foreground">
+                                    Previous 14 days
+                                </p>
+                                <p className="mt-1 text-xl font-semibold">
+                                    {attendanceSnapshot.previousVisits} visits
+                                </p>
+                            </div>
+
+                            <div className="rounded-lg border bg-muted/20 p-4">
+                                <p className="text-xs text-muted-foreground">
+                                    Expected
+                                </p>
+                                <p className="mt-1 text-xl font-semibold">
+                                    {attendanceSnapshot.expectedVisitsPerWeek === null
+                                        ? 'Not set'
+                                        : `${attendanceSnapshot.expectedVisitsPerWeek} / week`}
+                                </p>
+                            </div>
+
+                            <div className="rounded-lg border bg-muted/20 p-4">
+                                <p className="text-xs text-muted-foreground">
+                                    Last visit
+                                </p>
+                                <p className="mt-1 text-sm font-semibold">
+                                    {attendanceSnapshot.lastVisit
+                                        ? formatDateTime(attendanceSnapshot.lastVisit)
+                                        : 'No visits recorded'}
+                                </p>
+                            </div>
+                        </div>
+
+                        {openSignals.some(
+                            (signal) => signal.type === 'attendance_decline',
+                        ) && (
+                                <div className="mt-4 rounded-lg border border-destructive/30 bg-destructive/5 p-4">
+                                    <p className="text-sm font-medium text-destructive">
+                                        Attendance decline signal is currently open.
+                                    </p>
+                                    <p className="mt-1 text-xs text-muted-foreground">
+                                        Review the signal evidence and previous interventions before deciding the next action.
+                                    </p>
+                                </div>
+                            )}
+                    </section>
 
                     {/* Activity */}
                     <section className="rounded-lg border p-5 md:col-span-2">
@@ -1898,6 +2074,81 @@ export default function Show({
                                                     </p>
                                                 </div>
                                             )}
+
+                                            {intervention.signal_type && (
+                                                <p className="mt-2 text-xs text-muted-foreground">
+                                                    Trigger:{' '}
+                                                    {getSignalTypeLabel(
+                                                        intervention.signal_type,
+                                                    )}
+                                                    {intervention.signal_severity && (
+                                                        <>
+                                                            {' '}
+                                                            ·{' '}
+                                                            <span className="capitalize">
+                                                                {intervention.signal_severity}
+                                                            </span>{' '}
+                                                            severity
+                                                        </>
+                                                    )}
+                                                </p>
+                                            )}
+
+                                            {intervention.follow_up_status !==
+                                                'unavailable' && (
+                                                    <div className="mt-3 rounded-md bg-muted/40 p-3">
+                                                        <p className="text-xs font-medium">
+                                                            Attendance follow-up
+                                                        </p>
+
+                                                        {intervention.follow_up_status ===
+                                                            'in_progress' ? (
+                                                            <p className="mt-1 text-xs text-muted-foreground">
+                                                                The 14-day follow-up window is still in progress.
+                                                            </p>
+                                                        ) : (
+                                                            <>
+                                                                <div className="mt-2 grid grid-cols-3 gap-3 text-xs">
+                                                                    <div>
+                                                                        <p className="text-muted-foreground">
+                                                                            Before
+                                                                        </p>
+                                                                        <p className="mt-1 font-medium">
+                                                                            {intervention.attendance_before_14d ?? 0}{' '}
+                                                                            visits
+                                                                        </p>
+                                                                    </div>
+                                                                    <div>
+                                                                        <p className="text-muted-foreground">
+                                                                            After
+                                                                        </p>
+                                                                        <p className="mt-1 font-medium">
+                                                                            {intervention.attendance_after_14d ?? 0}{' '}
+                                                                            visits
+                                                                        </p>
+                                                                    </div>
+                                                                    <div>
+                                                                        <p className="text-muted-foreground">
+                                                                            Change
+                                                                        </p>
+                                                                        <p className="mt-1 font-medium">
+                                                                            {
+                                                                                (intervention.attendance_change ?? 0) > 0
+                                                                                    ? '+'
+                                                                                    : ''
+                                                                            }
+                                                                            {intervention.attendance_change ?? 0}
+                                                                        </p>
+                                                                    </div>
+                                                                </div>
+
+                                                                <p className="mt-2 text-[11px] text-muted-foreground">
+                                                                    Observed attendance change after the intervention; this is context, not proof of causation.
+                                                                </p>
+                                                            </>
+                                                        )}
+                                                    </div>
+                                                )}
                                         </div>
                                     ),
                                 )

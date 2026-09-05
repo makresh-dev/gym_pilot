@@ -23,10 +23,10 @@ type Member = {
     email: string | null;
     phone: string;
     date_of_birth: string | null;
-    membership_status: MembershipStatus;
-    financial_status: FinancialStatus;
+    membership_status: string | null;
+    financial_status: string | null;
     membership_expires_at: string | null;
-    balance_due: number;
+    balance_due: number | string | null | undefined;
 };
 
 type PaginationLink = {
@@ -47,8 +47,8 @@ type PaginatedMembers = {
 type MembersIndexProps = {
     members: PaginatedMembers;
     search: string;
-    membership_status: MembershipStatus | '';
-    financial_status: FinancialStatus | '';
+    membership_status: string | '';
+    financial_status: string | '';
 };
 
 const membershipFilters: {
@@ -63,11 +63,39 @@ const membershipFilters: {
     ];
 
 function formatCurrency(amount: number): string {
+    const safeAmount = Number.isFinite(Number(amount))
+        ? Number(amount)
+        : 0;
+
     return new Intl.NumberFormat('en-IN', {
         style: 'currency',
         currency: 'INR',
         maximumFractionDigits: 0,
-    }).format(amount);
+    }).format(safeAmount);
+}
+
+function normalizeMembershipStatus(status: string | null | undefined): MembershipStatus {
+    switch (status) {
+        case 'active':
+        case 'expiring':
+        case 'expired':
+        case 'none':
+            return status;
+        default:
+            return 'none';
+    }
+}
+
+function normalizeFinancialStatus(status: string | null | undefined): FinancialStatus {
+    return status === 'paid' ? 'paid' : 'outstanding';
+}
+
+function normalizeBalanceDue(
+    amount: number | string | null | undefined,
+): number {
+    const value = Number(amount);
+
+    return Number.isFinite(value) ? value : 0;
 }
 
 function formatDate(date: string | null): string {
@@ -113,7 +141,12 @@ function MembershipBadge({
                 'bg-muted text-muted-foreground ring-border',
             icon: AlertCircle,
         },
-    }[status];
+    }[status] ?? {
+        label: 'No Membership',
+        className:
+            'bg-muted text-muted-foreground ring-border',
+        icon: AlertCircle,
+    };
 
     const Icon = config.icon;
 
@@ -160,6 +193,16 @@ export default function Index({
 }: MembersIndexProps) {
     const [query, setQuery] = useState(search);
 
+    const normalizedMembershipStatus = membership_status &&
+        ['active', 'expiring', 'expired', 'none'].includes(membership_status)
+        ? membership_status as MembershipStatus
+        : '';
+
+    const normalizedFinancialStatus = financial_status &&
+        ['paid', 'outstanding'].includes(financial_status)
+        ? financial_status as FinancialStatus
+        : '';
+
     useEffect(() => {
         setQuery(search);
     }, [search]);
@@ -176,11 +219,11 @@ export default function Index({
                     ...(query.trim()
                         ? { search: query.trim() }
                         : {}),
-                    ...(membership_status
-                        ? { membership_status }
+                    ...(normalizedMembershipStatus
+                        ? { membership_status: normalizedMembershipStatus }
                         : {}),
-                    ...(financial_status
-                        ? { financial_status }
+                    ...(normalizedFinancialStatus
+                        ? { financial_status: normalizedFinancialStatus }
                         : {}),
                 },
                 {
@@ -195,8 +238,8 @@ export default function Index({
     }, [
         query,
         search,
-        membership_status,
-        financial_status,
+        normalizedMembershipStatus,
+        normalizedFinancialStatus,
     ]);
 
     function applyFilters(
@@ -438,13 +481,13 @@ export default function Index({
                                         <td className="px-5 py-4">
                                             <MembershipBadge
                                                 status={
-                                                    member.membership_status
+                                                    normalizeMembershipStatus(member.membership_status)
                                                 }
                                             />
 
                                             {member.membership_expires_at && (
                                                 <p className="mt-1 text-xs text-muted-foreground">
-                                                    {member.membership_status ===
+                                                    {normalizeMembershipStatus(member.membership_status) ===
                                                         'expired'
                                                         ? `Expired ${formatDate(member.membership_expires_at)}`
                                                         : `Ends ${formatDate(member.membership_expires_at)}`}
@@ -455,10 +498,12 @@ export default function Index({
                                         <td className="px-5 py-4">
                                             <FinancialBadge
                                                 status={
-                                                    member.financial_status
+                                                    normalizeFinancialStatus(member.financial_status)
                                                 }
                                                 balanceDue={
-                                                    member.balance_due
+                                                    normalizeBalanceDue(
+                                                        member.balance_due,
+                                                    )
                                                 }
                                             />
                                         </td>
@@ -540,13 +585,13 @@ export default function Index({
                                 <div className="mt-4 flex flex-wrap items-center gap-2">
                                     <MembershipBadge
                                         status={
-                                            member.membership_status
+                                            normalizeMembershipStatus(member.membership_status)
                                         }
                                     />
 
                                     {member.membership_expires_at && (
                                         <span className="text-xs text-muted-foreground">
-                                            {member.membership_status ===
+                                            {normalizeMembershipStatus(member.membership_status) ===
                                                 'expired'
                                                 ? `Expired ${formatDate(member.membership_expires_at)}`
                                                 : `Ends ${formatDate(member.membership_expires_at)}`}
@@ -557,10 +602,12 @@ export default function Index({
                                 <div className="mt-3 border-t pt-3">
                                     <FinancialBadge
                                         status={
-                                            member.financial_status
+                                            normalizeFinancialStatus(member.financial_status)
                                         }
                                         balanceDue={
-                                            member.balance_due
+                                            normalizeBalanceDue(
+                                                member.balance_due,
+                                            )
                                         }
                                     />
                                 </div>

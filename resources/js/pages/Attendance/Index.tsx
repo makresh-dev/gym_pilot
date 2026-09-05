@@ -10,6 +10,25 @@ type MemberSearchResult = {
     phone: string;
 };
 
+type AttendanceIntervention = {
+    type: string;
+    notes: string | null;
+    outcome: string | null;
+    intervened_at: string;
+};
+
+type AttendanceContext = {
+    weekly_visits: number;
+    has_open_attendance_signal: boolean;
+    latest_attendance_signal_status:
+    | 'open'
+    | 'resolved'
+    | 'dismissed'
+    | null;
+    expected_visits_per_week: number | null;
+    latest_intervention: AttendanceIntervention | null;
+};
+
 type AttendanceRecord = {
     id: string;
     member: {
@@ -19,6 +38,7 @@ type AttendanceRecord = {
     };
     check_in_at: string;
     source: string;
+    context: AttendanceContext;
 };
 
 type AttendanceStatus = {
@@ -52,6 +72,28 @@ function formatTime(date: string): string {
         hour: 'numeric',
         minute: '2-digit',
     });
+}
+
+function getInterventionLabel(type: string): string {
+    switch (type) {
+        case 'call_member':
+            return 'Called member';
+
+        case 'send_whatsapp':
+            return 'Sent WhatsApp';
+
+        case 'in_person':
+            return 'Spoke in person';
+
+        case 'follow_up':
+            return 'Scheduled follow-up';
+
+        case 'other':
+            return 'Other intervention';
+
+        default:
+            return type.replace(/_/g, ' ');
+    }
 }
 
 function shiftDate(date: string, days: number): string {
@@ -561,22 +603,93 @@ export default function Index({
                             {attendances.map((record) => (
                                 <div
                                     key={record.id}
-                                    className="flex items-center justify-between gap-4 px-6 py-4"
+                                    className="flex flex-col gap-3 px-6 py-4 sm:flex-row sm:items-center sm:justify-between"
                                 >
                                     <div className="min-w-0">
-                                        <Link
-                                            href={`/members/${record.member.id}`}
-                                            className="font-medium hover:underline"
-                                        >
-                                            {record.member.name}
-                                        </Link>
+                                        <div className="flex flex-wrap items-center gap-2">
+                                            <Link
+                                                href={`/members/${record.member.id}`}
+                                                className="font-medium hover:underline"
+                                            >
+                                                {record.member.name}
+                                            </Link>
+
+                                            {record.context.has_open_attendance_signal && (
+                                                <span className="rounded-full border border-amber-500/30 px-2 py-0.5 text-[11px] font-medium text-amber-600 dark:text-amber-400">
+                                                    Attendance declining
+                                                </span>
+                                            )}
+
+                                            {!record.context.has_open_attendance_signal &&
+                                                record.context.latest_attendance_signal_status ===
+                                                'resolved' && (
+                                                    <span className="rounded-full border border-emerald-500/30 px-2 py-0.5 text-[11px] font-medium text-emerald-600 dark:text-emerald-400">
+                                                        Attendance recovered
+                                                    </span>
+                                                )}
+                                        </div>
 
                                         <p className="text-sm text-muted-foreground">
                                             {record.member.phone}
                                         </p>
+
+                                        <div className="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-muted-foreground">
+                                            <span>
+                                                {record.context.weekly_visits}{' '}
+                                                {record.context.weekly_visits === 1
+                                                    ? 'visit'
+                                                    : 'visits'}{' '}
+                                                this week
+                                            </span>
+
+                                            {record.context.expected_visits_per_week !==
+                                                null && (
+                                                    <>
+                                                        <span
+                                                            aria-hidden="true"
+                                                            className="hidden sm:inline"
+                                                        >
+                                                            ·
+                                                        </span>
+
+                                                        <span>
+                                                            Expected{' '}
+                                                            {
+                                                                record.context
+                                                                    .expected_visits_per_week
+                                                            }
+                                                            /week
+                                                        </span>
+                                                    </>
+                                                )}
+                                        </div>
+
+                                        {record.context.latest_intervention && (
+                                            <div className="mt-2 rounded-md bg-muted/20 px-3 py-2 text-xs">
+                                                <span className="font-medium text-foreground">
+                                                    Last action:{' '}
+                                                </span>
+
+                                                {getInterventionLabel(
+                                                    record.context
+                                                        .latest_intervention.type,
+                                                )}
+
+                                                {record.context.latest_intervention.outcome && (
+                                                    <span>
+                                                        {' · '}
+                                                        {
+                                                            record.context
+                                                                .latest_intervention
+                                                                .outcome
+                                                        }
+                                                    </span>
+                                                )}
+                                            </div>
+                                        )}
                                     </div>
 
-                                    <div className="shrink-0 text-right">
+                                    <div className="shrink-0 text-left sm:text-right">
                                         <p className="text-sm font-medium">
                                             {formatTime(
                                                 record.check_in_at,

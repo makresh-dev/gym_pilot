@@ -255,18 +255,24 @@ class MemberController extends Controller
                     $expiringCutoff,
                 ) {
                     $activeMembership = $member->memberships
-                        ->filter(
-                            fn (Membership $membership) =>
-                                $membership->isActive($today)
-                        )
+                        ->filter(function (Membership $membership) use ($today) {
+                            $status = $membership->status;
+
+                            if ($status instanceof \BackedEnum) {
+                                $status = $status->value;
+                            }
+
+                            return $status === 'active'
+                                && $membership->start_date->lte($today)
+                                && $membership->end_date->gte($today);
+                        })
                         ->sortBy('end_date')
                         ->first();
 
                     $latestExpiredMembership = $member->memberships
-                        ->filter(
-                            fn (Membership $membership) =>
-                                $membership->isExpired($today)
-                        )
+                        ->filter(function (Membership $membership) use ($today) {
+                            return $membership->end_date->lt($today);
+                        })
                         ->sortByDesc('end_date')
                         ->first();
 
@@ -294,7 +300,7 @@ class MemberController extends Controller
 
                     $totalBalanceDue = $member->memberships->sum(
                         fn (Membership $membership) =>
-                            $membership->balanceDue()
+                            (float) ($membership->balanceDue() ?? 0)
                     );
 
                     return [
@@ -431,6 +437,78 @@ class MemberController extends Controller
             'membership_expires_at' => $membershipExpiresAt,
             'balance_due' => round($totalBalanceDue, 2),
         ];
+
+        $member->interventions->each(function ($intervention) use ($member) {
+            $intervenedDate = $intervention->intervened_at?->copy()->startOfDay();
+
+            if (! $intervenedDate) {
+                $intervention->setAttribute('signal_type', null);
+                $intervention->setAttribute('signal_severity', null);
+                $intervention->setAttribute('attendance_before_14d', null);
+                $intervention->setAttribute('attendance_after_14d', null);
+                $intervention->setAttribute('attendance_change', null);
+                $intervention->setAttribute('follow_up_status', 'unavailable');
+
+                return;
+            }
+
+            $signal = $member->signals
+                ->firstWhere('id', $intervention->signal_id);
+
+            $beforeStart = $intervenedDate->copy()->subDays(14);
+            $beforeEnd = $intervenedDate->copy()->subDay();
+            $followUpEnd = $intervenedDate->copy()->addDays(13);
+            $today = Carbon::today();
+
+            $afterEnd = $followUpEnd->lte($today)
+                ? $followUpEnd
+                : $today;
+
+            $beforeCount = Attendance::query()
+                ->where('organization_id', $member->organization_id)
+                ->where('member_id', $member->id)
+                ->whereBetween('check_in_at', [
+                    $beforeStart->startOfDay(),
+                    $beforeEnd->endOfDay(),
+                ])
+                ->count();
+
+            $afterCount = Attendance::query()
+                ->where('organization_id', $member->organization_id)
+                ->where('member_id', $member->id)
+                ->whereBetween('check_in_at', [
+                    $intervenedDate->startOfDay(),
+                    $afterEnd->endOfDay(),
+                ])
+                ->count();
+
+            $intervention->setAttribute(
+                'signal_type',
+                $signal?->type?->value
+            );
+            $intervention->setAttribute(
+                'signal_severity',
+                $signal?->severity?->value
+            );
+            $intervention->setAttribute(
+                'attendance_before_14d',
+                $beforeCount
+            );
+            $intervention->setAttribute(
+                'attendance_after_14d',
+                $afterCount
+            );
+            $intervention->setAttribute(
+                'attendance_change',
+                $afterCount - $beforeCount
+            );
+            $intervention->setAttribute(
+                'follow_up_status',
+                $followUpEnd->lte($today)
+                    ? 'ready'
+                    : 'in_progress'
+            );
+        });
 
         $member->setRelation(
             'attendances',
