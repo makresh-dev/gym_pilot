@@ -2,8 +2,10 @@
 
 namespace App\Http\Controllers;
 
+use App\Models\Attendance;
 use App\Models\Member;
 use App\Services\AttendanceService;
+use Carbon\Carbon;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Inertia\Inertia;
@@ -21,35 +23,69 @@ class AttendanceController extends Controller
     {
         $organizationId = $request->user()->organization_id;
 
-        $attendances = Member::query()
+        $dateInput = $request->string('date')->toString();
+
+        try {
+            $date = $dateInput !== ''
+                ? Carbon::createFromFormat('Y-m-d', $dateInput)->startOfDay()
+                : today();
+        } catch (\Throwable) {
+            $date = today();
+            $dateInput = '';
+        }
+
+        $search = trim(
+            $request->string('search')->toString()
+        );
+
+        $attendances = Attendance::query()
             ->where('organization_id', $organizationId)
+            ->whereDate('check_in_at', $date)
             ->with([
-                'attendances' => function ($query) {
-                    $query
-                        ->whereDate('check_in_at', today())
-                        ->latest('check_in_at');
-                },
+                'member:id,name,phone',
             ])
+            ->when(
+                $search !== '',
+                function ($query) use ($search) {
+                    $query->whereHas(
+                        'member',
+                        function ($query) use ($search) {
+                            $query
+                                ->where(
+                                    'name',
+                                    'ilike',
+                                    "%{$search}%"
+                                )
+                                ->orWhere(
+                                    'phone',
+                                    'ilike',
+                                    "%{$search}%"
+                                );
+                        }
+                    );
+                }
+            )
+            ->latest('check_in_at')
             ->get()
-            ->flatMap(function ($member) {
-                return $member->attendances->map(function ($attendance) use ($member) {
-                    return [
-                        'id' => $attendance->id,
-                        'member' => [
-                            'id' => $member->id,
-                            'name' => $member->name,
-                            'phone' => $member->phone,
-                        ],
-                        'check_in_at' => $attendance->check_in_at,
-                        'source' => $attendance->source,
-                    ];
-                });
+            ->map(function (Attendance $attendance) {
+                return [
+                    'id' => $attendance->id,
+                    'member' => [
+                        'id' => $attendance->member->id,
+                        'name' => $attendance->member->name,
+                        'phone' => $attendance->member->phone,
+                    ],
+                    'check_in_at' => $attendance->check_in_at,
+                    'source' => $attendance->source,
+                ];
             })
-            ->sortByDesc('check_in_at')
             ->values();
 
         return Inertia::render('Attendance/Index', [
             'attendances' => $attendances,
+            'date' => $date->toDateString(),
+            'search' => $search,
+            'isToday' => $date->isToday(),
         ]);
     }
 
@@ -60,7 +96,10 @@ class AttendanceController extends Controller
         ]);
 
         $members = Member::query()
-            ->where('organization_id', $request->user()->organization_id)
+            ->where(
+                'organization_id',
+                $request->user()->organization_id
+            )
             ->where(function ($query) use ($request) {
                 $search = $request->string('query');
 
@@ -86,8 +125,13 @@ class AttendanceController extends Controller
         ]);
 
         $member = Member::query()
-            ->where('organization_id', $request->user()->organization_id)
-            ->findOrFail($request->string('member_id'));
+            ->where(
+                'organization_id',
+                $request->user()->organization_id
+            )
+            ->findOrFail(
+                $request->string('member_id')
+            );
 
         try {
             $this->attendanceService->checkIn($member);
@@ -103,33 +147,36 @@ class AttendanceController extends Controller
         );
     }
 
-    public function status(Request $request, Member $member): JsonResponse
-{
-    abort_unless(
-        $member->organization_id === $request->user()->organization_id,
-        404
-    );
+    public function status(
+        Request $request,
+        Member $member
+    ): JsonResponse {
+        abort_unless(
+            $member->organization_id ===
+                $request->user()->organization_id,
+            404
+        );
 
-    $today = today();
+        $today = today();
 
-    $attendance = $member->attendances()
-        ->whereDate('check_in_at', $today)
-        ->latest('check_in_at')
-        ->first();
+        $attendance = $member->attendances()
+            ->whereDate('check_in_at', $today)
+            ->latest('check_in_at')
+            ->first();
 
-    $membership = $member->memberships()
-        ->where('status', 'active')
-        ->whereDate('start_date', '<=', $today)
-        ->whereDate('end_date', '>=', $today)
-        ->latest('end_date')
-        ->first();
+        $membership = $member->memberships()
+            ->where('status', 'active')
+            ->whereDate('start_date', '<=', $today)
+            ->whereDate('end_date', '>=', $today)
+            ->latest('end_date')
+            ->first();
 
-    return response()->json([
-        'checked_in' => $attendance !== null,
-        'check_in_at' => $attendance?->check_in_at,
+        return response()->json([
+            'checked_in' => $attendance !== null,
+            'check_in_at' => $attendance?->check_in_at,
 
-        'membership_active' => $membership !== null,
-        'membership_end_date' => $membership?->end_date,
-    ]);
-}
+            'membership_active' => $membership !== null,
+            'membership_end_date' => $membership?->end_date,
+        ]);
+    }
 }

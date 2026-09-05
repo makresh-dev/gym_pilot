@@ -123,6 +123,20 @@ const dismissalReasons: {
         },
     ];
 
+function getGreeting(): string {
+    const hour = new Date().getHours();
+
+    if (hour < 12) {
+        return 'Good morning';
+    }
+
+    if (hour < 17) {
+        return 'Good afternoon';
+    }
+
+    return 'Good evening';
+}
+
 export default function Dashboard({
     stats,
     signals,
@@ -135,7 +149,7 @@ export default function Dashboard({
                 {/* Header */}
                 <div>
                     <h1 className="text-2xl font-semibold">
-                        Good morning
+                        {getGreeting()}
                     </h1>
 
                     <p className="mt-1 text-sm text-muted-foreground">
@@ -143,32 +157,89 @@ export default function Dashboard({
                     </p>
                 </div>
 
-                {/* Main stats */}
+                {/* Today context */}
+                <div className="flex flex-wrap items-center gap-x-4 gap-y-2 text-sm text-muted-foreground">
+                    <span>
+                        <strong className="font-medium text-foreground">
+                            {stats.today_check_ins}
+                        </strong>{' '}
+                        check-ins today
+                    </span>
+
+                    <span className="hidden h-4 w-px bg-border sm:block" />
+
+                    <Link
+                        href="/members?membership_status=expiring"
+                        className="hover:text-foreground hover:underline"
+                    >
+                        <strong className="font-medium text-foreground">
+                            {stats.expiring_memberships}
+                        </strong>{' '}
+                        expiring memberships
+                    </Link>
+
+                    <span className="hidden h-4 w-px bg-border sm:block" />
+
+                    <Link
+                        href="/members?financial_status=outstanding"
+                        className="hover:text-foreground hover:underline"
+                    >
+                        <strong className="font-medium text-foreground">
+                            {formatCurrency(stats.outstanding_balance)}
+                        </strong>{' '}
+                        outstanding
+                    </Link>
+
+                    <span className="hidden h-4 w-px bg-border sm:block" />
+
+                    <Link
+                        href="#attention"
+                        className="hover:text-foreground hover:underline"
+                    >
+                        <strong className="font-medium text-foreground">
+                            {stats.open_signals}
+                        </strong>{' '}
+                        open signals
+                    </Link>
+                </div>
+
+                {/* Operational summary */}
                 <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
                     <StatCard
                         label="Active Members"
                         value={stats.active_members}
+                        href="/members?membership_status=active"
+                        action="View members"
                     />
 
                     <StatCard
                         label="Today's Check-ins"
                         value={stats.today_check_ins}
+                        href="/attendance"
+                        action="View attendance"
                     />
 
                     <StatCard
                         label="Expiring Soon"
                         value={stats.expiring_memberships}
+                        href="/members?membership_status=expiring"
+                        action="View expiring"
                     />
 
                     <StatCard
                         label="Open Signals"
                         value={stats.open_signals}
+                        href="#attention"
+                        action="Review signals"
                     />
                 </div>
 
                 {/* Financial summary */}
-                <section className="rounded-xl border p-5">
-                    <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between sm:gap-6">
+                <Link
+                    href="/members?financial_status=outstanding"
+                    className="group rounded-xl border p-5 transition hover:bg-muted/20"
+                >
+                    <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between sm:gap-6">
                         <div>
                             <h2 className="text-lg font-semibold">
                                 Outstanding Balance
@@ -180,27 +251,39 @@ export default function Dashboard({
                             </p>
                         </div>
 
-                        <p className="whitespace-nowrap text-2xl font-semibold">
-                            ₹{stats.outstanding_balance.toFixed(2)}
-                        </p>
-                    </div>
-                </section>
+                        <div className="text-left sm:text-right">
+                            <p className="whitespace-nowrap text-2xl font-semibold">
+                                {formatCurrency(
+                                    stats.outstanding_balance,
+                                )}
+                            </p>
 
-                {/* Attention Center */}
-                <section className="rounded-xl border p-5">
-                    <div className="flex items-center justify-between gap-4">
+                            <p className="mt-1 text-xs text-muted-foreground group-hover:text-foreground">
+                                View members with outstanding balances →
+                            </p>
+                        </div>
+                    </div>
+                </Link>
+
+                {/* Needs attention today */}
+                <section id="attention" className="scroll-mt-6 rounded-xl border p-5">
+                    <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
                         <div>
                             <h2 className="text-lg font-semibold">
-                                Members Needing Attention
+                                Needs Attention Today
                             </h2>
 
                             <p className="mt-1 text-sm text-muted-foreground">
-                                Recent changes that may require action.
+                                Open signals are ordered by severity, then
+                                by recency.
                             </p>
                         </div>
 
-                        <span className="rounded-full border px-2.5 py-1 text-sm font-medium">
-                            {signals.length}
+                        <span className="w-fit rounded-full border px-2.5 py-1 text-sm font-medium">
+                            {signals.length}{' '}
+                            {signals.length === 1
+                                ? 'item'
+                                : 'items'}
                         </span>
                     </div>
 
@@ -212,8 +295,7 @@ export default function Dashboard({
                                 </p>
 
                                 <p className="mt-1 text-sm text-muted-foreground">
-                                    Your current open signals have been
-                                    cleared.
+                                    Open signals have been cleared.
                                 </p>
                             </div>
                         ) : (
@@ -257,9 +339,7 @@ function SignalCard({ signal }: SignalCardProps) {
 
     const [processing, setProcessing] = useState(false);
 
-    const [error, setError] = useState<string | null>(
-        null,
-    );
+    const [error, setError] = useState<string | null>(null);
 
     const isAttendanceDecline =
         signal.type === 'attendance_decline';
@@ -287,13 +367,11 @@ function SignalCard({ signal }: SignalCardProps) {
             },
             {
                 preserveScroll: true,
-
                 onSuccess: () => {
                     setShowInterventionForm(false);
                     setNotes('');
                     setOutcome('');
                 },
-
                 onError: (errors) => {
                     const firstError = Object.values(
                         errors,
@@ -304,7 +382,6 @@ function SignalCard({ signal }: SignalCardProps) {
                         'Unable to record the intervention.',
                     );
                 },
-
                 onFinish: () => {
                     setProcessing(false);
                 },
@@ -324,13 +401,11 @@ function SignalCard({ signal }: SignalCardProps) {
             },
             {
                 preserveScroll: true,
-
                 onSuccess: () => {
                     setShowDismissForm(false);
                     setDismissalNotes('');
                     setDismissalReason('other');
                 },
-
                 onError: (errors) => {
                     const firstError = Object.values(
                         errors,
@@ -341,7 +416,6 @@ function SignalCard({ signal }: SignalCardProps) {
                         'Unable to dismiss the signal.',
                     );
                 },
-
                 onFinish: () => {
                     setProcessing(false);
                 },
@@ -361,11 +435,10 @@ function SignalCard({ signal }: SignalCardProps) {
 
     return (
         <article className="overflow-hidden rounded-xl border">
-            {/* Severity indicator */}
             <div className={severity.indicatorClass} />
 
             <div className="p-5">
-                {/* Header */}
+                {/* Signal header */}
                 <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
                     <div className="min-w-0">
                         <div className="flex flex-wrap items-center gap-2">
@@ -387,9 +460,16 @@ function SignalCard({ signal }: SignalCardProps) {
                             {signalTitle}
                         </p>
                     </div>
+
+                    <Link
+                        href={`/members/${signal.member.id}`}
+                        className="w-fit rounded-md border px-3 py-1.5 text-xs font-medium hover:bg-muted"
+                    >
+                        View Member
+                    </Link>
                 </div>
 
-                {/* Attendance decline evidence */}
+                {/* Evidence */}
                 {isAttendanceDecline && (
                     <div className="mt-5">
                         {signal.evidence.decline_percentage !==
@@ -440,7 +520,6 @@ function SignalCard({ signal }: SignalCardProps) {
                     </div>
                 )}
 
-                {/* Membership expiry evidence */}
                 {isMembershipExpiring && (
                     <div className="mt-5">
                         {signal.evidence.days_remaining !==
@@ -524,13 +603,6 @@ function SignalCard({ signal }: SignalCardProps) {
                                         Record Intervention
                                     </button>
 
-                                    <Link
-                                        href={`/members/${signal.member.id}`}
-                                        className="inline-flex rounded-md border px-3 py-2 text-sm font-medium hover:bg-muted"
-                                    >
-                                        View Member
-                                    </Link>
-
                                     {signal.member.phone && (
                                         <a
                                             href={`tel:${signal.member.phone}`}
@@ -567,9 +639,8 @@ function SignalCard({ signal }: SignalCardProps) {
                                 </h3>
 
                                 <p className="mt-1 text-sm text-muted-foreground">
-                                    Record what you actually did. The
-                                    signal stays open until its condition
-                                    is resolved.
+                                    Record what you actually did. The signal
+                                    stays open until its condition is resolved.
                                 </p>
                             </div>
 
@@ -584,7 +655,6 @@ function SignalCard({ signal }: SignalCardProps) {
                         </div>
 
                         <div className="mt-4 grid gap-4">
-                            {/* Intervention type */}
                             <div>
                                 <label
                                     htmlFor={`intervention-type-${signal.id}`}
@@ -622,7 +692,6 @@ function SignalCard({ signal }: SignalCardProps) {
                                 </select>
                             </div>
 
-                            {/* Notes */}
                             <div>
                                 <label
                                     htmlFor={`intervention-notes-${signal.id}`}
@@ -647,7 +716,6 @@ function SignalCard({ signal }: SignalCardProps) {
                                 />
                             </div>
 
-                            {/* Outcome */}
                             <div>
                                 <label
                                     htmlFor={`intervention-outcome-${signal.id}`}
@@ -672,12 +740,10 @@ function SignalCard({ signal }: SignalCardProps) {
                                 />
                             </div>
 
-                            {/* Error */}
                             {error && (
                                 <ErrorMessage message={error} />
                             )}
 
-                            {/* Actions */}
                             <div className="flex justify-end gap-2">
                                 <button
                                     type="button"
@@ -715,8 +781,8 @@ function SignalCard({ signal }: SignalCardProps) {
                                 </h3>
 
                                 <p className="mt-1 text-sm text-muted-foreground">
-                                    Tell us why this signal does not need
-                                    further attention.
+                                    Tell us why this signal does not need further
+                                    attention.
                                 </p>
                             </div>
 
@@ -731,7 +797,6 @@ function SignalCard({ signal }: SignalCardProps) {
                         </div>
 
                         <div className="mt-4 grid gap-4">
-                            {/* Reason */}
                             <div>
                                 <label
                                     htmlFor={`dismissal-reason-${signal.id}`}
@@ -769,7 +834,6 @@ function SignalCard({ signal }: SignalCardProps) {
                                 </select>
                             </div>
 
-                            {/* Notes */}
                             <div>
                                 <label
                                     htmlFor={`dismissal-notes-${signal.id}`}
@@ -794,12 +858,10 @@ function SignalCard({ signal }: SignalCardProps) {
                                 />
                             </div>
 
-                            {/* Error */}
                             {error && (
                                 <ErrorMessage message={error} />
                             )}
 
-                            {/* Actions */}
                             <div className="flex justify-end gap-2">
                                 <button
                                     type="button"
@@ -998,6 +1060,14 @@ function getSeverityPresentation(
     }
 }
 
+function formatCurrency(amount: number): string {
+    return new Intl.NumberFormat('en-IN', {
+        style: 'currency',
+        currency: 'INR',
+        maximumFractionDigits: 0,
+    }).format(amount);
+}
+
 function formatDate(date: string): string {
     return new Date(
         `${date}T00:00:00`,
@@ -1010,6 +1080,7 @@ function formatDate(date: string): string {
 
 function formatDateTime(date: string): string {
     return new Date(date).toLocaleString('en-IN', {
+        timeZone: 'Asia/Kolkata',
         day: 'numeric',
         month: 'short',
         year: 'numeric',
@@ -1021,14 +1092,21 @@ function formatDateTime(date: string): string {
 type StatCardProps = {
     label: string;
     value: number;
+    href: string;
+    action: string;
 };
 
 function StatCard({
     label,
     value,
+    href,
+    action,
 }: StatCardProps) {
     return (
-        <div className="rounded-xl border p-5">
+        <Link
+            href={href}
+            className="group rounded-xl border p-5 transition hover:bg-muted/20"
+        >
             <p className="text-sm text-muted-foreground">
                 {label}
             </p>
@@ -1036,7 +1114,11 @@ function StatCard({
             <p className="mt-2 text-3xl font-semibold">
                 {value}
             </p>
-        </div>
+
+            <p className="mt-3 text-xs text-muted-foreground group-hover:text-foreground">
+                {action} →
+            </p>
+        </Link>
     );
 }
 

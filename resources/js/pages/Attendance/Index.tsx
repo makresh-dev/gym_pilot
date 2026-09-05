@@ -1,4 +1,4 @@
-import { Head, Link, useForm } from '@inertiajs/react';
+import { Head, Link, router, useForm } from '@inertiajs/react';
 import * as React from 'react';
 
 import { dashboard } from '@/routes';
@@ -30,18 +30,67 @@ type AttendanceStatus = {
 
 type AttendanceProps = {
     attendances: AttendanceRecord[];
+    date: string;
+    search: string;
+    isToday: boolean;
 };
 
-export default function Index({ attendances }: AttendanceProps) {
-    const [query, setQuery] = React.useState('');
-    const [members, setMembers] = React.useState<MemberSearchResult[]>([]);
+function formatDate(date: string): string {
+    return new Date(`${date}T00:00:00`).toLocaleDateString(
+        'en-IN',
+        {
+            day: 'numeric',
+            month: 'short',
+            year: 'numeric',
+        },
+    );
+}
+
+function formatTime(date: string): string {
+    return new Date(date).toLocaleTimeString('en-IN', {
+        timeZone: 'Asia/Kolkata',
+        hour: 'numeric',
+        minute: '2-digit',
+    });
+}
+
+function shiftDate(date: string, days: number): string {
+    const value = new Date(`${date}T00:00:00`);
+
+    value.setDate(value.getDate() + days);
+
+    const year = value.getFullYear();
+    const month = String(value.getMonth() + 1).padStart(2, '0');
+    const day = String(value.getDate()).padStart(2, '0');
+
+    return `${year}-${month}-${day}`;
+}
+
+export default function Index({
+    attendances,
+    date,
+    search,
+    isToday,
+}: AttendanceProps) {
+    const [memberQuery, setMemberQuery] = React.useState('');
+
+    const [listSearch, setListSearch] =
+        React.useState(search);
+
+    const [members, setMembers] = React.useState<
+        MemberSearchResult[]
+    >([]);
+
     const [searching, setSearching] = React.useState(false);
+
     const [selectedMember, setSelectedMember] =
         React.useState<MemberSearchResult | null>(null);
 
     const [attendanceStatus, setAttendanceStatus] =
         React.useState<AttendanceStatus | null>(null);
-    const [checkingStatus, setCheckingStatus] = React.useState(false);
+
+    const [checkingStatus, setCheckingStatus] =
+        React.useState(false);
 
     const {
         data,
@@ -55,7 +104,11 @@ export default function Index({ attendances }: AttendanceProps) {
     });
 
     React.useEffect(() => {
-        if (query.trim().length < 2 || selectedMember) {
+        setListSearch(search);
+    }, [search]);
+
+    React.useEffect(() => {
+        if (memberQuery.trim().length < 2 || selectedMember) {
             setMembers([]);
             return;
         }
@@ -65,7 +118,7 @@ export default function Index({ attendances }: AttendanceProps) {
 
             try {
                 const response = await fetch(
-                    `${attendance.search().url}?query=${encodeURIComponent(query)}`,
+                    `${attendance.search().url}?query=${encodeURIComponent(memberQuery)}`,
                     {
                         headers: {
                             Accept: 'application/json',
@@ -74,7 +127,9 @@ export default function Index({ attendances }: AttendanceProps) {
                 );
 
                 if (!response.ok) {
-                    throw new Error('Failed to search members.');
+                    throw new Error(
+                        'Failed to search members.',
+                    );
                 }
 
                 const results: MemberSearchResult[] =
@@ -89,12 +144,39 @@ export default function Index({ attendances }: AttendanceProps) {
         }, 300);
 
         return () => window.clearTimeout(timer);
-    }, [query, selectedMember]);
+    }, [memberQuery, selectedMember]);
 
-    const selectMember = async (member: MemberSearchResult) => {
+    React.useEffect(() => {
+        if (listSearch === search) {
+            return;
+        }
+
+        const timer = window.setTimeout(() => {
+            router.get(
+                attendance.index().url,
+                {
+                    ...(listSearch.trim()
+                        ? { search: listSearch.trim() }
+                        : {}),
+                    ...(date ? { date } : {}),
+                },
+                {
+                    preserveState: true,
+                    preserveScroll: true,
+                    replace: true,
+                },
+            );
+        }, 300);
+
+        return () => window.clearTimeout(timer);
+    }, [listSearch, search, date]);
+
+    const selectMember = async (
+        member: MemberSearchResult,
+    ) => {
         setSelectedMember(member);
         setData('member_id', member.id);
-        setQuery(member.name);
+        setMemberQuery(member.name);
         setMembers([]);
 
         setAttendanceStatus(null);
@@ -111,10 +193,13 @@ export default function Index({ attendances }: AttendanceProps) {
             );
 
             if (!response.ok) {
-                throw new Error('Failed to check attendance status.');
+                throw new Error(
+                    'Failed to check attendance status.',
+                );
             }
 
-            const status: AttendanceStatus = await response.json();
+            const status: AttendanceStatus =
+                await response.json();
 
             setAttendanceStatus(status);
         } catch {
@@ -127,15 +212,35 @@ export default function Index({ attendances }: AttendanceProps) {
     const clearSelection = () => {
         setSelectedMember(null);
         setAttendanceStatus(null);
-        setQuery('');
+        setMemberQuery('');
         setData('member_id', '');
         setMembers([]);
     };
 
-    const checkIn = (event: React.FormEvent) => {
+    const changeDate = (nextDate: string) => {
+        router.get(
+            attendance.index().url,
+            {
+                ...(search
+                    ? { search }
+                    : {}),
+                date: nextDate,
+            },
+            {
+                preserveState: true,
+                preserveScroll: true,
+                replace: true,
+            },
+        );
+    };
+
+    const checkIn = (
+        event: React.FormEvent,
+    ) => {
         event.preventDefault();
 
         if (
+            !isToday ||
             !data.member_id ||
             attendanceStatus?.checked_in ||
             !attendanceStatus?.membership_active
@@ -147,7 +252,7 @@ export default function Index({ attendances }: AttendanceProps) {
             preserveScroll: true,
             onSuccess: () => {
                 reset();
-                setQuery('');
+                setMemberQuery('');
                 setSelectedMember(null);
                 setAttendanceStatus(null);
             },
@@ -159,217 +264,306 @@ export default function Index({ attendances }: AttendanceProps) {
             <Head title="Attendance" />
 
             <div className="flex h-full flex-1 flex-col gap-6 p-6">
-                <div>
-                    <h1 className="text-2xl font-semibold tracking-tight">
-                        Attendance
-                    </h1>
+                {/* Header */}
+                <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
+                    <div>
+                        <h1 className="text-2xl font-semibold tracking-tight">
+                            Attendance
+                        </h1>
 
-                    <p className="text-sm text-muted-foreground">
-                        Check members in and view today&apos;s attendance.
+                        <p className="mt-1 text-sm text-muted-foreground">
+                            Check members in and review attendance history.
+                        </p>
+                    </div>
+
+                    <div className="flex items-center gap-2">
+                        <button
+                            type="button"
+                            onClick={() =>
+                                changeDate(
+                                    shiftDate(date, -1),
+                                )
+                            }
+                            className="inline-flex h-9 items-center rounded-md border px-3 text-sm font-medium hover:bg-muted"
+                        >
+                            ←
+                        </button>
+
+                        <button
+                            type="button"
+                            onClick={() =>
+                                changeDate(
+                                    new Date()
+                                        .toISOString()
+                                        .slice(0, 10),
+                                )
+                            }
+                            className={[
+                                'h-9 rounded-md border px-3 text-sm font-medium hover:bg-muted',
+                                isToday
+                                    ? 'bg-muted'
+                                    : '',
+                            ].join(' ')}
+                        >
+                            Today
+                        </button>
+
+                        <button
+                            type="button"
+                            onClick={() =>
+                                changeDate(
+                                    shiftDate(date, 1),
+                                )
+                            }
+                            disabled={isToday}
+                            className="inline-flex h-9 items-center rounded-md border px-3 text-sm font-medium hover:bg-muted disabled:cursor-not-allowed disabled:opacity-40"
+                        >
+                            →
+                        </button>
+                    </div>
+                </div>
+
+                {/* Date heading */}
+                <div className="rounded-lg border bg-muted/20 px-4 py-3">
+                    <p className="text-sm font-medium">
+                        {isToday
+                            ? "Today's Check-ins"
+                            : `Check-ins · ${formatDate(date)}`}
+                    </p>
+
+                    <p className="mt-1 text-xs text-muted-foreground">
+                        {attendances.length}{' '}
+                        {attendances.length === 1
+                            ? 'check-in'
+                            : 'check-ins'}
                     </p>
                 </div>
 
-                <div className="rounded-xl border bg-card p-6">
-                    <form
-                        onSubmit={checkIn}
-                        className="flex flex-col gap-4"
-                    >
-                        <div className="relative">
-                            <label
-                                htmlFor="member-search"
-                                className="mb-2 block text-sm font-medium"
-                            >
-                                Find member
-                            </label>
+                {/* Check-in panel */}
+                {isToday && (
+                    <div className="rounded-xl border bg-card p-6">
+                        <form
+                            onSubmit={checkIn}
+                            className="flex flex-col gap-4"
+                        >
+                            <div className="relative">
+                                <label
+                                    htmlFor="member-search"
+                                    className="mb-2 block text-sm font-medium"
+                                >
+                                    Check in member
+                                </label>
 
-                            <input
-                                id="member-search"
-                                type="text"
-                                value={query}
-                                onChange={(event) => {
-                                    setQuery(event.target.value);
-                                    setSelectedMember(null);
-                                    setAttendanceStatus(null);
-                                    setData('member_id', '');
-                                }}
-                                placeholder="Search by name or phone..."
-                                autoComplete="off"
-                                className="w-full rounded-md border bg-background px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-ring"
-                            />
+                                <input
+                                    id="member-search"
+                                    type="text"
+                                    value={memberQuery}
+                                    onChange={(event) => {
+                                        setMemberQuery(
+                                            event.target.value,
+                                        );
+                                        setSelectedMember(null);
+                                        setAttendanceStatus(null);
+                                        setData(
+                                            'member_id',
+                                            '',
+                                        );
+                                    }}
+                                    placeholder="Search by name or phone..."
+                                    autoComplete="off"
+                                    className="w-full rounded-md border bg-background px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-ring"
+                                />
 
-                            {searching && (
-                                <p className="mt-2 text-sm text-muted-foreground">
-                                    Searching...
-                                </p>
-                            )}
+                                {searching && (
+                                    <p className="mt-2 text-sm text-muted-foreground">
+                                        Searching...
+                                    </p>
+                                )}
 
-                            {members.length > 0 && (
-                                <div className="absolute z-10 mt-1 w-full overflow-hidden rounded-md border bg-popover shadow-md">
-                                    {members.map((member) => (
+                                {members.length > 0 && (
+                                    <div className="absolute z-10 mt-1 w-full overflow-hidden rounded-md border bg-popover shadow-md">
+                                        {members.map((member) => (
+                                            <button
+                                                key={member.id}
+                                                type="button"
+                                                onClick={() =>
+                                                    selectMember(
+                                                        member,
+                                                    )
+                                                }
+                                                className="block w-full px-4 py-3 text-left hover:bg-muted"
+                                            >
+                                                <div className="font-medium">
+                                                    {member.name}
+                                                </div>
+
+                                                <div className="text-sm text-muted-foreground">
+                                                    {member.phone}
+                                                </div>
+                                            </button>
+                                        ))}
+                                    </div>
+                                )}
+                            </div>
+
+                            {selectedMember && (
+                                <div className="rounded-lg border bg-muted/30 p-4">
+                                    <div className="flex items-center justify-between gap-4">
+                                        <div>
+                                            <p className="font-medium">
+                                                {
+                                                    selectedMember.name
+                                                }
+                                            </p>
+
+                                            <p className="text-sm text-muted-foreground">
+                                                {
+                                                    selectedMember.phone
+                                                }
+                                            </p>
+                                        </div>
+
                                         <button
-                                            key={member.id}
                                             type="button"
-                                            onClick={() =>
-                                                selectMember(member)
-                                            }
-                                            className="block w-full px-4 py-3 text-left hover:bg-muted"
+                                            onClick={clearSelection}
+                                            className="text-sm text-muted-foreground hover:text-foreground"
                                         >
-                                            <div className="font-medium">
-                                                {member.name}
-                                            </div>
-
-                                            <div className="text-sm text-muted-foreground">
-                                                {member.phone}
-                                            </div>
+                                            Change
                                         </button>
-                                    ))}
-                                </div>
-                            )}
-                        </div>
-
-                        {selectedMember && (
-                            <div className="rounded-lg border bg-muted/30 p-4">
-                                <div className="flex items-center justify-between gap-4">
-                                    <div>
-                                        <p className="font-medium">
-                                            {selectedMember.name}
-                                        </p>
-
-                                        <p className="text-sm text-muted-foreground">
-                                            {selectedMember.phone}
-                                        </p>
                                     </div>
 
-                                    <button
-                                        type="button"
-                                        onClick={clearSelection}
-                                        className="text-sm text-muted-foreground hover:text-foreground"
-                                    >
-                                        Change
-                                    </button>
-                                </div>
+                                    <div className="mt-4 space-y-3">
+                                        {checkingStatus && (
+                                            <p className="text-sm text-muted-foreground">
+                                                Checking member status...
+                                            </p>
+                                        )}
 
-                                <div className="mt-4 space-y-3">
-                                    {checkingStatus && (
-                                        <p className="text-sm text-muted-foreground">
-                                            Checking member status...
-                                        </p>
-                                    )}
+                                        {!checkingStatus &&
+                                            attendanceStatus?.checked_in && (
+                                                <div className="flex items-center justify-between rounded-md border px-4 py-3">
+                                                    <div>
+                                                        <p className="font-medium">
+                                                            Already checked in today
+                                                        </p>
 
-                                    {!checkingStatus &&
-                                        attendanceStatus?.checked_in && (
-                                            <div className="flex items-center justify-between rounded-md border px-4 py-3">
-                                                <div>
+                                                        {attendanceStatus.check_in_at && (
+                                                            <p className="text-sm text-muted-foreground">
+                                                                {formatTime(
+                                                                    attendanceStatus.check_in_at,
+                                                                )}
+                                                            </p>
+                                                        )}
+                                                    </div>
+
+                                                    <span className="text-sm font-medium text-muted-foreground">
+                                                        Checked in
+                                                    </span>
+                                                </div>
+                                            )}
+
+                                        {!checkingStatus &&
+                                            attendanceStatus &&
+                                            !attendanceStatus.checked_in &&
+                                            !attendanceStatus.membership_active && (
+                                                <div className="rounded-md border border-destructive/30 bg-destructive/5 px-4 py-3">
                                                     <p className="font-medium">
-                                                        Already checked in today
+                                                        Membership inactive
                                                     </p>
 
-                                                    {attendanceStatus.check_in_at && (
-                                                        <p className="text-sm text-muted-foreground">
-                                                            {new Date(
-                                                                attendanceStatus.check_in_at,
-                                                            ).toLocaleTimeString(
-                                                                [],
-                                                                {
-                                                                    hour: '2-digit',
-                                                                    minute: '2-digit',
-                                                                },
-                                                            )}
-                                                        </p>
-                                                    )}
-                                                </div>
-
-                                                <span className="text-sm font-medium text-muted-foreground">
-                                                    Checked in
-                                                </span>
-                                            </div>
-                                        )}
-
-                                    {!checkingStatus &&
-                                        attendanceStatus &&
-                                        !attendanceStatus.checked_in &&
-                                        !attendanceStatus.membership_active && (
-                                            <div className="rounded-md border border-destructive/30 bg-destructive/5 px-4 py-3">
-                                                <p className="font-medium">
-                                                    Membership inactive
-                                                </p>
-
-                                                <p className="mt-1 text-sm text-muted-foreground">
-                                                    This member does not have an
-                                                    active membership today.
-                                                </p>
-                                            </div>
-                                        )}
-
-                                    {!checkingStatus &&
-                                        attendanceStatus &&
-                                        !attendanceStatus.checked_in &&
-                                        attendanceStatus.membership_active && (
-                                            <>
-                                                <div className="rounded-md border px-4 py-3">
-                                                    <p className="font-medium">
-                                                        Membership active
+                                                    <p className="mt-1 text-sm text-muted-foreground">
+                                                        This member does not have
+                                                        an active membership today.
                                                     </p>
-
-                                                    {attendanceStatus.membership_end_date && (
-                                                        <p className="mt-1 text-sm text-muted-foreground">
-                                                            Valid until{' '}
-                                                            {new Date(
-                                                                attendanceStatus.membership_end_date,
-                                                            ).toLocaleDateString(
-                                                                [],
-                                                                {
-                                                                    day: 'numeric',
-                                                                    month: 'short',
-                                                                    year: 'numeric',
-                                                                },
-                                                            )}
-                                                        </p>
-                                                    )}
                                                 </div>
+                                            )}
 
-                                                <button
-                                                    type="submit"
-                                                    disabled={processing}
-                                                    className="w-full rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground disabled:opacity-50"
-                                                >
-                                                    {processing
-                                                        ? 'Checking in...'
-                                                        : 'Check In'}
-                                                </button>
-                                            </>
-                                        )}
+                                        {!checkingStatus &&
+                                            attendanceStatus &&
+                                            !attendanceStatus.checked_in &&
+                                            attendanceStatus.membership_active && (
+                                                <>
+                                                    <div className="rounded-md border px-4 py-3">
+                                                        <p className="font-medium">
+                                                            Membership active
+                                                        </p>
+
+                                                        {attendanceStatus.membership_end_date && (
+                                                            <p className="mt-1 text-sm text-muted-foreground">
+                                                                Valid until{' '}
+                                                                {formatDate(
+                                                                    attendanceStatus.membership_end_date,
+                                                                )}
+                                                            </p>
+                                                        )}
+                                                    </div>
+
+                                                    <button
+                                                        type="submit"
+                                                        disabled={processing}
+                                                        className="w-full rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground disabled:opacity-50"
+                                                    >
+                                                        {processing
+                                                            ? 'Checking in...'
+                                                            : 'Check In'}
+                                                    </button>
+                                                </>
+                                            )}
+                                    </div>
                                 </div>
-                            </div>
-                        )}
+                            )}
 
-                        {errors.member_id && (
-                            <p className="text-sm text-destructive">
-                                {errors.member_id}
-                            </p>
-                        )}
-                    </form>
-                </div>
+                            {errors.member_id && (
+                                <p className="text-sm text-destructive">
+                                    {errors.member_id}
+                                </p>
+                            )}
+                        </form>
+                    </div>
+                )}
 
+                {/* Attendance list */}
                 <div className="rounded-xl border bg-card">
-                    <div className="border-b px-6 py-4">
-                        <h2 className="font-semibold">
-                            Today&apos;s Check-ins
-                        </h2>
+                    <div className="flex flex-col gap-3 border-b px-6 py-4 sm:flex-row sm:items-center sm:justify-between">
+                        <div>
+                            <h2 className="font-semibold">
+                                {isToday
+                                    ? "Today's Check-ins"
+                                    : `Check-ins · ${formatDate(date)}`}
+                            </h2>
+
+                            <p className="mt-1 text-xs text-muted-foreground">
+                                Filter this day by member name or phone.
+                            </p>
+                        </div>
+
+                        <div className="relative w-full sm:max-w-xs">
+                            <input
+                                type="search"
+                                value={listSearch}
+                                onChange={(event) =>
+                                    setListSearch(
+                                        event.target.value,
+                                    )
+                                }
+                                placeholder="Search attendance..."
+                                className="h-9 w-full rounded-md border bg-background px-3 text-sm outline-none focus:ring-2 focus:ring-ring"
+                            />
+                        </div>
                     </div>
 
                     {attendances.length === 0 ? (
                         <div className="px-6 py-10 text-center text-sm text-muted-foreground">
-                            No check-ins today.
+                            No check-ins recorded for this day.
                         </div>
                     ) : (
                         <div className="divide-y">
                             {attendances.map((record) => (
                                 <div
                                     key={record.id}
-                                    className="flex items-center justify-between px-6 py-4"
+                                    className="flex items-center justify-between gap-4 px-6 py-4"
                                 >
-                                    <div>
+                                    <div className="min-w-0">
                                         <Link
                                             href={`/members/${record.member.id}`}
                                             className="font-medium hover:underline"
@@ -382,14 +576,11 @@ export default function Index({ attendances }: AttendanceProps) {
                                         </p>
                                     </div>
 
-                                    <div className="text-right">
+                                    <div className="shrink-0 text-right">
                                         <p className="text-sm font-medium">
-                                            {new Date(
+                                            {formatTime(
                                                 record.check_in_at,
-                                            ).toLocaleTimeString([], {
-                                                hour: '2-digit',
-                                                minute: '2-digit',
-                                            })}
+                                            )}
                                         </p>
 
                                         <p className="text-xs capitalize text-muted-foreground">
