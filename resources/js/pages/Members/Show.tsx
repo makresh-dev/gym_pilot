@@ -182,6 +182,20 @@ type InterventionForm = {
     outcome: string;
 };
 
+type ContextForm = {
+    visits_per_week: string;
+    goal: string;
+    start_date: string;
+};
+
+const goalOptions = [
+    { value: 'weight_loss', label: 'Weight loss' },
+    { value: 'muscle_gain', label: 'Muscle gain' },
+    { value: 'general_fitness', label: 'General fitness' },
+    { value: 'strength', label: 'Strength' },
+    { value: 'other', label: 'Other' },
+];
+
 const interventionTypes = [
     {
         value: 'call_member',
@@ -760,14 +774,24 @@ export default function Show({
     checkedInToday,
     timeline,
 }: ShowProps) {
+    const todayKey = new Date().toLocaleDateString('en-CA', {
+        timeZone: 'Asia/Kolkata',
+    });
+
     const currentExpectation =
         member.expectations.find(
-            (expectation) => expectation.end_date === null,
+            (expectation) =>
+                expectation.start_date.slice(0, 10) <= todayKey &&
+                (expectation.end_date === null ||
+                    expectation.end_date.slice(0, 10) >= todayKey),
         ) ?? null;
 
     const currentGoal =
         member.goals.find(
-            (goal) => goal.end_date === null,
+            (goal) =>
+                goal.start_date.slice(0, 10) <= todayKey &&
+                (goal.end_date === null ||
+                    goal.end_date.slice(0, 10) >= todayKey),
         ) ?? null;
 
     const attendanceSnapshot = getAttendanceSnapshot(
@@ -830,6 +854,17 @@ export default function Show({
     const [checkInError, setCheckInError] = useState<string | null>(
         null,
     );
+    const [editingContext, setEditingContext] = useState(false);
+
+    const contextForm = useForm<ContextForm>({
+        visits_per_week: currentExpectation
+            ? String(currentExpectation.visits_per_week)
+            : '',
+        goal: currentGoal?.goal ?? '',
+        start_date: new Date().toLocaleDateString('en-CA', {
+            timeZone: 'Asia/Kolkata',
+        }),
+    });
 
     const hasActiveMembership = member.memberships.some(
         (membership) =>
@@ -906,6 +941,42 @@ export default function Show({
                 },
                 onFinish: () => {
                     setCheckingIn(false);
+                },
+            },
+        );
+    }
+
+    function handleContextEdit(): void {
+        contextForm.setData({
+            visits_per_week: currentExpectation
+                ? String(currentExpectation.visits_per_week)
+                : '',
+            goal: currentGoal?.goal ?? '',
+            start_date: new Date().toLocaleDateString('en-CA', {
+                timeZone: 'Asia/Kolkata',
+            }),
+        });
+        contextForm.clearErrors();
+        setEditingContext(true);
+    }
+
+    function submitContext(event: FormEvent<HTMLFormElement>): void {
+        event.preventDefault();
+
+        contextForm.transform((data) => ({
+            visits_per_week: data.visits_per_week === ''
+                ? null
+                : Number(data.visits_per_week),
+            goal: data.goal || null,
+            start_date: data.start_date,
+        }));
+
+        contextForm.patch(
+            `/members/${member.id}/context`,
+            {
+                preserveScroll: true,
+                onSuccess: () => {
+                    setEditingContext(false);
                 },
             },
         );
@@ -1114,137 +1185,304 @@ export default function Show({
 
                     {/* Context */}
                     <section className="rounded-lg border p-5">
-                        <h2 className="text-lg font-semibold">
-                            Context
-                        </h2>
-
-                        <div className="mt-4 space-y-4 text-sm">
+                        <div className="flex items-start justify-between gap-4">
                             <div>
-                                <p className="text-muted-foreground">
-                                    Expected visits
-                                </p>
+                                <h2 className="text-lg font-semibold">
+                                    Context
+                                </h2>
 
-                                <p className="mt-1 font-medium">
-                                    {currentExpectation
-                                        ? `${currentExpectation.visits_per_week} / week`
-                                        : 'Not set'}
+                                <p className="mt-1 text-sm text-muted-foreground">
+                                    The expectations and goals used to understand this member's activity.
                                 </p>
                             </div>
 
-                            <div>
-                                <p className="text-muted-foreground">
-                                    Current goal
-                                </p>
-
-                                <p className="mt-1 font-medium capitalize">
-                                    {currentGoal
-                                        ? currentGoal.goal.replace(
-                                            /_/g,
-                                            ' ',
-                                        )
-                                        : 'Not set'}
-                                </p>
-                            </div>
+                            {!editingContext && (
+                                <button
+                                    type="button"
+                                    onClick={handleContextEdit}
+                                    className="rounded-md border px-3 py-1.5 text-sm font-medium hover:bg-muted"
+                                >
+                                    Edit
+                                </button>
+                            )}
                         </div>
-                    </section>
 
-                    {/* Operational Attention */}
-                    {(openSignals.length > 0 ||
-                        operationalStatus.financial_status === 'outstanding' ||
-                        operationalStatus.membership_status === 'expiring' ||
-                        operationalStatus.membership_status === 'expired' ||
-                        operationalStatus.membership_status === 'none') && (
-                            <section className="rounded-lg border p-5 md:col-span-2">
+                        {!editingContext ? (
+                            <div className="mt-4 space-y-4 text-sm">
                                 <div>
-                                    <h2 className="text-lg font-semibold">
-                                        Attention
-                                    </h2>
+                                    <p className="text-muted-foreground">
+                                        Expected visits
+                                    </p>
 
-                                    <p className="mt-1 text-sm text-muted-foreground">
-                                        Items that may need action for this member.
+                                    <p className="mt-1 font-medium">
+                                        {currentExpectation
+                                            ? `${currentExpectation.visits_per_week} / week`
+                                            : 'Not set'}
                                     </p>
                                 </div>
 
-                                <div className="mt-4 grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
-                                    {operationalStatus.membership_status ===
-                                        'expiring' && (
-                                            <div className="rounded-lg border bg-muted/20 p-4">
-                                                <p className="text-sm font-medium">
-                                                    Membership is expiring
-                                                </p>
+                                <div>
+                                    <p className="text-muted-foreground">
+                                        Current goal
+                                    </p>
 
-                                                <p className="mt-1 text-sm text-muted-foreground">
-                                                    Ends{' '}
-                                                    {formatDate(
-                                                        operationalStatus.membership_expires_at!,
-                                                    )}
-                                                </p>
-                                            </div>
+                                    <p className="mt-1 font-medium capitalize">
+                                        {currentGoal
+                                            ? currentGoal.goal.replace(/_/g, ' ')
+                                            : 'Not set'}
+                                    </p>
+                                </div>
+                            </div>
+                        ) : (
+                            <form
+                                onSubmit={submitContext}
+                                className="mt-4 space-y-4"
+                            >
+                                <div>
+                                    <label
+                                        htmlFor="context-visits"
+                                        className="mb-1.5 block text-sm font-medium"
+                                    >
+                                        Expected visits per week
+                                    </label>
+
+                                    <select
+                                        id="context-visits"
+                                        value={contextForm.data.visits_per_week}
+                                        onChange={(event) =>
+                                            contextForm.setData(
+                                                'visits_per_week',
+                                                event.target.value,
+                                            )
+                                        }
+                                        disabled={contextForm.processing}
+                                        className="h-10 w-full rounded-md border bg-background px-3 text-sm"
+                                    >
+                                        <option value="">Not set</option>
+                                        {Array.from({ length: 7 }, (_, index) => index + 1).map(
+                                            (value) => (
+                                                <option key={value} value={value}>
+                                                    {value} {value === 1 ? 'visit' : 'visits'} / week
+                                                </option>
+                                            ),
                                         )}
+                                    </select>
 
-                                    {operationalStatus.membership_status ===
-                                        'expired' && (
-                                            <div className="rounded-lg border bg-muted/20 p-4">
-                                                <p className="text-sm font-medium">
-                                                    Membership has expired
-                                                </p>
-
-                                                <p className="mt-1 text-sm text-muted-foreground">
-                                                    Latest membership expired{' '}
-                                                    {formatDate(
-                                                        operationalStatus.membership_expires_at!,
-                                                    )}
-                                                </p>
-                                            </div>
-                                        )}
-
-                                    {operationalStatus.membership_status ===
-                                        'none' && (
-                                            <div className="rounded-lg border bg-muted/20 p-4">
-                                                <p className="text-sm font-medium">
-                                                    No active membership
-                                                </p>
-
-                                                <p className="mt-1 text-sm text-muted-foreground">
-                                                    Add a membership to restore access.
-                                                </p>
-                                            </div>
-                                        )}
-
-                                    {operationalStatus.financial_status ===
-                                        'outstanding' && (
-                                            <div className="rounded-lg border bg-muted/20 p-4">
-                                                <p className="text-sm font-medium">
-                                                    Outstanding balance
-                                                </p>
-
-                                                <p className="mt-1 text-sm text-muted-foreground">
-                                                    {formatCurrency(
-                                                        operationalStatus.balance_due,
-                                                    )}{' '}
-                                                    needs to be collected.
-                                                </p>
-                                            </div>
-                                        )}
-
-                                    {openSignals.length > 0 && (
-                                        <div className="rounded-lg border bg-muted/20 p-4">
-                                            <p className="text-sm font-medium">
-                                                {openSignals.length}{' '}
-                                                {openSignals.length === 1
-                                                    ? 'open signal'
-                                                    : 'open signals'}
-                                            </p>
-
-                                            <p className="mt-1 text-sm text-muted-foreground">
-                                                Review the signal history below and
-                                                record the intervention.
-                                            </p>
-                                        </div>
+                                    {contextForm.errors.visits_per_week && (
+                                        <p className="mt-1 text-sm text-destructive">
+                                            {contextForm.errors.visits_per_week}
+                                        </p>
                                     )}
                                 </div>
-                            </section>
+
+                                <div>
+                                    <label
+                                        htmlFor="context-goal"
+                                        className="mb-1.5 block text-sm font-medium"
+                                    >
+                                        Goal
+                                    </label>
+
+                                    <select
+                                        id="context-goal"
+                                        value={contextForm.data.goal}
+                                        onChange={(event) =>
+                                            contextForm.setData(
+                                                'goal',
+                                                event.target.value,
+                                            )
+                                        }
+                                        disabled={contextForm.processing}
+                                        className="h-10 w-full rounded-md border bg-background px-3 text-sm"
+                                    >
+                                        <option value="">Not set</option>
+                                        {contextForm.data.goal &&
+                                            !goalOptions.some(
+                                                (option) => option.value === contextForm.data.goal,
+                                            ) && (
+                                                <option value={contextForm.data.goal}>
+                                                    {contextForm.data.goal.replace(/_/g, ' ')}
+                                                </option>
+                                            )}
+                                        {goalOptions.map((option) => (
+                                            <option key={option.value} value={option.value}>
+                                                {option.label}
+                                            </option>
+                                        ))}
+                                    </select>
+
+                                    {contextForm.errors.goal && (
+                                        <p className="mt-1 text-sm text-destructive">
+                                            {contextForm.errors.goal}
+                                        </p>
+                                    )}
+                                </div>
+
+                                <div>
+                                    <label
+                                        htmlFor="context-start-date"
+                                        className="mb-1.5 block text-sm font-medium"
+                                    >
+                                        Effective from
+                                    </label>
+
+                                    <input
+                                        id="context-start-date"
+                                        type="date"
+                                        value={contextForm.data.start_date}
+                                        onChange={(event) =>
+                                            contextForm.setData(
+                                                'start_date',
+                                                event.target.value,
+                                            )
+                                        }
+                                        disabled={contextForm.processing}
+                                        className="h-10 w-full rounded-md border bg-background px-3 text-sm"
+                                    />
+
+                                    {contextForm.errors.start_date && (
+                                        <p className="mt-1 text-sm text-destructive">
+                                            {contextForm.errors.start_date}
+                                        </p>
+                                    )}
+                                </div>
+
+                                {contextForm.errors.context && (
+                                    <p className="text-sm text-destructive">
+                                        {contextForm.errors.context}
+                                    </p>
+                                )}
+
+                                <p className="text-xs text-muted-foreground">
+                                    Saving creates a new context period and preserves the previous history.
+                                </p>
+
+                                <div className="flex flex-wrap gap-2">
+                                    <button
+                                        type="submit"
+                                        disabled={contextForm.processing}
+                                        className="rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground disabled:cursor-not-allowed disabled:opacity-50"
+                                    >
+                                        {contextForm.processing ? 'Saving...' : 'Save Context'}
+                                    </button>
+
+                                    <button
+                                        type="button"
+                                        disabled={contextForm.processing}
+                                        onClick={() => setEditingContext(false)}
+                                        className="rounded-md border px-4 py-2 text-sm font-medium"
+                                    >
+                                        Cancel
+                                    </button>
+                                </div>
+                            </form>
                         )}
+                    </section>
+
+                    {/* Context History */}
+                    <section className="rounded-lg border p-5 md:col-span-2">
+                        <div>
+                            <h2 className="text-lg font-semibold">
+                                Context History
+                            </h2>
+                            <p className="mt-1 text-sm text-muted-foreground">
+                                Previous expectations and goals are preserved so attendance changes can be interpreted against the right context.
+                            </p>
+                        </div>
+
+                        <div className="mt-5 grid gap-4 md:grid-cols-2">
+                            <div className="rounded-lg border">
+                                <div className="border-b px-4 py-3">
+                                    <h3 className="text-sm font-semibold">
+                                        Attendance Expectations
+                                    </h3>
+                                </div>
+
+                                <div className="divide-y">
+                                    {member.expectations.length === 0 ? (
+                                        <p className="px-4 py-4 text-sm text-muted-foreground">
+                                            No expectation history recorded.
+                                        </p>
+                                    ) : (
+                                        [...member.expectations]
+                                            .sort((a, b) =>
+                                                b.start_date.localeCompare(a.start_date),
+                                            )
+                                            .map((expectation) => (
+                                                <div key={expectation.id} className="px-4 py-4">
+                                                    <div className="flex items-start justify-between gap-3">
+                                                        <p className="font-medium">
+                                                            {expectation.visits_per_week}{' '}
+                                                            {expectation.visits_per_week === 1 ? 'visit' : 'visits'} / week
+                                                        </p>
+                                                        <span
+                                                            className={`rounded-full border px-2 py-0.5 text-[11px] font-medium ${expectation.end_date === null
+                                                                ? 'border-primary/30 text-primary'
+                                                                : 'border-muted-foreground/30 text-muted-foreground'
+                                                                }`}
+                                                        >
+                                                            {expectation.end_date === null ? 'Current' : 'Past'}
+                                                        </span>
+                                                    </div>
+                                                    <p className="mt-1 text-xs text-muted-foreground">
+                                                        {formatDate(expectation.start_date)}
+                                                        {' → '}
+                                                        {expectation.end_date
+                                                            ? formatDate(expectation.end_date)
+                                                            : 'Present'}
+                                                    </p>
+                                                </div>
+                                            ))
+                                    )}
+                                </div>
+                            </div>
+
+                            <div className="rounded-lg border">
+                                <div className="border-b px-4 py-3">
+                                    <h3 className="text-sm font-semibold">
+                                        Goal History
+                                    </h3>
+                                </div>
+
+                                <div className="divide-y">
+                                    {member.goals.length === 0 ? (
+                                        <p className="px-4 py-4 text-sm text-muted-foreground">
+                                            No goal history recorded.
+                                        </p>
+                                    ) : (
+                                        [...member.goals]
+                                            .sort((a, b) =>
+                                                b.start_date.localeCompare(a.start_date),
+                                            )
+                                            .map((goal) => (
+                                                <div key={goal.id} className="px-4 py-4">
+                                                    <div className="flex items-start justify-between gap-3">
+                                                        <p className="font-medium capitalize">
+                                                            {goal.goal.replace(/_/g, ' ')}
+                                                        </p>
+                                                        <span
+                                                            className={`rounded-full border px-2 py-0.5 text-[11px] font-medium ${goal.end_date === null
+                                                                ? 'border-primary/30 text-primary'
+                                                                : 'border-muted-foreground/30 text-muted-foreground'
+                                                                }`}
+                                                        >
+                                                            {goal.end_date === null ? 'Current' : 'Past'}
+                                                        </span>
+                                                    </div>
+                                                    <p className="mt-1 text-xs text-muted-foreground">
+                                                        {formatDate(goal.start_date)}
+                                                        {' → '}
+                                                        {goal.end_date
+                                                            ? formatDate(goal.end_date)
+                                                            : 'Present'}
+                                                    </p>
+                                                </div>
+                                            ))
+                                    )}
+                                </div>
+                            </div>
+                        </div>
+                    </section>
 
                     {/* Engagement Snapshot */}
                     <section className="rounded-lg border p-5 md:col-span-2">

@@ -27,6 +27,7 @@ use App\Services\PaymentService;
 use Carbon\Carbon;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Gate;
 use Inertia\Inertia;
 use Inertia\Response;
@@ -532,6 +533,123 @@ class MemberController extends Controller
             'timeline' => $timeline,
             'checkedInToday' => $checkedInToday,
         ]);
+    }
+
+    public function updateContext(Request $request, Member $member): RedirectResponse
+    {
+        Gate::authorize('update', $member);
+
+        $validated = $request->validate([
+            'visits_per_week' => ['nullable', 'integer', 'min:1', 'max:7'],
+            'goal' => ['nullable', 'string', 'max:100'],
+            'start_date' => ['required', 'date', 'before_or_equal:today'],
+        ]);
+
+        if (
+            ($validated['visits_per_week'] ?? null) === null
+            && blank($validated['goal'] ?? null)
+        ) {
+            return back()->withErrors([
+                'context' => 'Set an expected visit frequency or a goal.',
+            ]);
+        }
+
+        $startDate = Carbon::parse($validated['start_date'])->startOfDay();
+
+        $currentExpectation = $member->expectations()
+            ->whereNull('end_date')
+            ->latest('start_date')
+            ->first();
+
+        if ($currentExpectation && $startDate->lt($currentExpectation->start_date)) {
+            return back()->withErrors([
+                'start_date' => 'Expected visits cannot start before the current expectation.',
+            ]);
+        }
+
+        $currentGoal = $member->goals()
+            ->whereNull('end_date')
+            ->latest('start_date')
+            ->first();
+
+        if ($currentGoal && $startDate->lt($currentGoal->start_date)) {
+            return back()->withErrors([
+                'start_date' => 'Goal cannot start before the current goal.',
+            ]);
+        }
+
+        DB::transaction(function () use (
+            $member,
+            $validated,
+            $startDate,
+            $currentExpectation,
+            $currentGoal,
+        ) {
+            $previousDay = $startDate->copy()->subDay();
+
+            if (array_key_exists('visits_per_week', $validated)) {
+
+                if ($currentExpectation && $startDate->equalTo($currentExpectation->start_date)) {
+                    if (($validated['visits_per_week'] ?? null) === null) {
+                        $currentExpectation->update([
+                            'end_date' => $previousDay->toDateString(),
+                        ]);
+                    } else {
+                        $currentExpectation->update([
+                            'visits_per_week' => $validated['visits_per_week'],
+                        ]);
+                    }
+                } else {
+                    if ($currentExpectation) {
+                        $currentExpectation->update([
+                            'end_date' => $previousDay->toDateString(),
+                        ]);
+                    }
+
+                    if (($validated['visits_per_week'] ?? null) !== null) {
+                        $member->expectations()->create([
+                            'visits_per_week' => $validated['visits_per_week'],
+                            'start_date' => $startDate->toDateString(),
+                            'end_date' => null,
+                        ]);
+                    }
+                }
+            }
+
+            if (array_key_exists('goal', $validated)) {
+                $goal = filled($validated['goal'] ?? null)
+                    ? trim($validated['goal'])
+                    : null;
+
+                if ($currentGoal && $startDate->equalTo($currentGoal->start_date)) {
+                    if ($goal === null) {
+                        $currentGoal->update([
+                            'end_date' => $previousDay->toDateString(),
+                        ]);
+                    } else {
+                        $currentGoal->update([
+                            'goal' => $goal,
+                        ]);
+                    }
+                } else {
+                    if ($currentGoal) {
+                        $currentGoal->update([
+                            'end_date' => $previousDay->toDateString(),
+                        ]);
+                    }
+
+                    if ($goal !== null) {
+                        $member->goals()->create([
+                            'goal' => $goal,
+                            'start_date' => $startDate->toDateString(),
+                            'end_date' => null,
+                        ]);
+                    }
+                }
+            }
+        });
+
+        return back();
     }
 
     public function storeIntervention(

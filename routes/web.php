@@ -107,6 +107,12 @@ Route::middleware(['auth'])->group(function () {
     'dismissSignal',
     ])->name('members.signals.dismiss');
 
+    Route::patch(
+    '/members/{member}/memberships/{membership}',
+    [MemberController::class, 'updateMembership'],
+    )->name('members.memberships.update');
+
+    
 
 });
 
