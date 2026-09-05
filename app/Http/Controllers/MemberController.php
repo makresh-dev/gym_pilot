@@ -13,6 +13,7 @@ use App\Http\Requests\StoreMembershipRequest;
 use App\Http\Requests\StorePaymentRequest;
 use App\Http\Requests\UpdateMemberRequest;
 use App\Models\Attendance;
+use App\Models\FollowUpTask;
 use App\Models\Member;
 use App\Models\Membership;
 use App\Models\MembershipPlan;
@@ -27,7 +28,6 @@ use App\Services\PaymentService;
 use Carbon\Carbon;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
-use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Gate;
 use Inertia\Inertia;
 use Inertia\Response;
@@ -256,24 +256,18 @@ class MemberController extends Controller
                     $expiringCutoff,
                 ) {
                     $activeMembership = $member->memberships
-                        ->filter(function (Membership $membership) use ($today) {
-                            $status = $membership->status;
-
-                            if ($status instanceof \BackedEnum) {
-                                $status = $status->value;
-                            }
-
-                            return $status === 'active'
-                                && $membership->start_date->lte($today)
-                                && $membership->end_date->gte($today);
-                        })
+                        ->filter(
+                            fn (Membership $membership) =>
+                                $membership->isActive($today)
+                        )
                         ->sortBy('end_date')
                         ->first();
 
                     $latestExpiredMembership = $member->memberships
-                        ->filter(function (Membership $membership) use ($today) {
-                            return $membership->end_date->lt($today);
-                        })
+                        ->filter(
+                            fn (Membership $membership) =>
+                                $membership->isExpired($today)
+                        )
                         ->sortByDesc('end_date')
                         ->first();
 
@@ -301,7 +295,7 @@ class MemberController extends Controller
 
                     $totalBalanceDue = $member->memberships->sum(
                         fn (Membership $membership) =>
-                            (float) ($membership->balanceDue() ?? 0)
+                            $membership->balanceDue()
                     );
 
                     return [
@@ -527,129 +521,40 @@ class MemberController extends Controller
 
         $timeline = $timelineService->build($member);
 
+        /*
+         * Persistent follow-up tasks for this member.
+         *
+         * Staff assignment is intentionally not exposed in the MVP.
+         * assigned_to_user_id remains nullable in the database for the
+         * future multi-staff subscription tier.
+         */
+        $followUpTasks = FollowUpTask::query()
+            ->where('organization_id', $member->organization_id)
+            ->where('member_id', $member->id)
+            ->with([
+                'intervention:id,signal_id,type,notes,outcome,intervened_at',
+            ])
+            ->orderByRaw(
+                "CASE WHEN status = 'pending' THEN 0 ELSE 1 END"
+            )
+            ->orderBy('due_date')
+            ->get([
+                'id',
+                'member_id',
+                'intervention_id',
+                'status',
+                'due_date',
+                'completed_at',
+                'completion_notes',
+            ]);
+
         return Inertia::render('Members/Show', [
             'member' => $member,
             'operationalStatus' => $operationalStatus,
             'timeline' => $timeline,
             'checkedInToday' => $checkedInToday,
+            'followUpTasks' => $followUpTasks,
         ]);
-    }
-
-    public function updateContext(Request $request, Member $member): RedirectResponse
-    {
-        Gate::authorize('update', $member);
-
-        $validated = $request->validate([
-            'visits_per_week' => ['nullable', 'integer', 'min:1', 'max:7'],
-            'goal' => ['nullable', 'string', 'max:100'],
-            'start_date' => ['required', 'date', 'before_or_equal:today'],
-        ]);
-
-        if (
-            ($validated['visits_per_week'] ?? null) === null
-            && blank($validated['goal'] ?? null)
-        ) {
-            return back()->withErrors([
-                'context' => 'Set an expected visit frequency or a goal.',
-            ]);
-        }
-
-        $startDate = Carbon::parse($validated['start_date'])->startOfDay();
-
-        $currentExpectation = $member->expectations()
-            ->whereNull('end_date')
-            ->latest('start_date')
-            ->first();
-
-        if ($currentExpectation && $startDate->lt($currentExpectation->start_date)) {
-            return back()->withErrors([
-                'start_date' => 'Expected visits cannot start before the current expectation.',
-            ]);
-        }
-
-        $currentGoal = $member->goals()
-            ->whereNull('end_date')
-            ->latest('start_date')
-            ->first();
-
-        if ($currentGoal && $startDate->lt($currentGoal->start_date)) {
-            return back()->withErrors([
-                'start_date' => 'Goal cannot start before the current goal.',
-            ]);
-        }
-
-        DB::transaction(function () use (
-            $member,
-            $validated,
-            $startDate,
-            $currentExpectation,
-            $currentGoal,
-        ) {
-            $previousDay = $startDate->copy()->subDay();
-
-            if (array_key_exists('visits_per_week', $validated)) {
-
-                if ($currentExpectation && $startDate->equalTo($currentExpectation->start_date)) {
-                    if (($validated['visits_per_week'] ?? null) === null) {
-                        $currentExpectation->update([
-                            'end_date' => $previousDay->toDateString(),
-                        ]);
-                    } else {
-                        $currentExpectation->update([
-                            'visits_per_week' => $validated['visits_per_week'],
-                        ]);
-                    }
-                } else {
-                    if ($currentExpectation) {
-                        $currentExpectation->update([
-                            'end_date' => $previousDay->toDateString(),
-                        ]);
-                    }
-
-                    if (($validated['visits_per_week'] ?? null) !== null) {
-                        $member->expectations()->create([
-                            'visits_per_week' => $validated['visits_per_week'],
-                            'start_date' => $startDate->toDateString(),
-                            'end_date' => null,
-                        ]);
-                    }
-                }
-            }
-
-            if (array_key_exists('goal', $validated)) {
-                $goal = filled($validated['goal'] ?? null)
-                    ? trim($validated['goal'])
-                    : null;
-
-                if ($currentGoal && $startDate->equalTo($currentGoal->start_date)) {
-                    if ($goal === null) {
-                        $currentGoal->update([
-                            'end_date' => $previousDay->toDateString(),
-                        ]);
-                    } else {
-                        $currentGoal->update([
-                            'goal' => $goal,
-                        ]);
-                    }
-                } else {
-                    if ($currentGoal) {
-                        $currentGoal->update([
-                            'end_date' => $previousDay->toDateString(),
-                        ]);
-                    }
-
-                    if ($goal !== null) {
-                        $member->goals()->create([
-                            'goal' => $goal,
-                            'start_date' => $startDate->toDateString(),
-                            'end_date' => null,
-                        ]);
-                    }
-                }
-            }
-        });
-
-        return back();
     }
 
     public function storeIntervention(
@@ -753,6 +658,207 @@ class MemberController extends Controller
         ]);
     }
 
+    public function editContext(Member $member): Response
+{
+    Gate::authorize('update', $member);
+
+    $today = Carbon::today();
+
+    $currentExpectation = $member->expectations()
+        ->whereDate('start_date', '<=', $today)
+        ->where(function ($query) use ($today) {
+            $query
+                ->whereNull('end_date')
+                ->orWhereDate('end_date', '>=', $today);
+        })
+        ->latest('start_date')
+        ->first();
+
+    $currentGoal = $member->goals()
+        ->whereDate('start_date', '<=', $today)
+        ->where(function ($query) use ($today) {
+            $query
+                ->whereNull('end_date')
+                ->orWhereDate('end_date', '>=', $today);
+        })
+        ->latest('start_date')
+        ->first();
+
+    return Inertia::render('Members/EditContext', [
+        'member' => [
+            'id' => $member->id,
+            'name' => $member->name,
+            'phone' => $member->phone,
+        ],
+        'currentExpectation' => $currentExpectation,
+        'currentGoal' => $currentGoal,
+    ]);
+}
+
+public function updateContext(
+    Request $request,
+    Member $member,
+): RedirectResponse {
+    Gate::authorize('update', $member);
+
+    $validated = $request->validate([
+        'visits_per_week' => [
+            'nullable',
+            'integer',
+            'min:1',
+            'max:7',
+        ],
+        'goal' => [
+            'nullable',
+            'string',
+            'max:100',
+        ],
+        'start_date' => [
+            'required',
+            'date',
+            'before_or_equal:today',
+        ],
+    ]);
+
+    $visitsPerWeek = $validated['visits_per_week'] ?? null;
+
+    $goal = filled($validated['goal'] ?? null)
+        ? trim($validated['goal'])
+        : null;
+
+    if ($visitsPerWeek === null && $goal === null) {
+        return back()->withErrors([
+            'context' => 'Set an expected visit frequency or a goal.',
+        ]);
+    }
+
+    $startDate = Carbon::parse(
+        $validated['start_date']
+    )->startOfDay();
+
+    $currentExpectation = $member->expectations()
+        ->whereNull('end_date')
+        ->latest('start_date')
+        ->first();
+
+    $currentGoal = $member->goals()
+        ->whereNull('end_date')
+        ->latest('start_date')
+        ->first();
+
+    if (
+        $currentExpectation &&
+        $startDate->lt($currentExpectation->start_date)
+    ) {
+        return back()->withErrors([
+            'start_date' =>
+                'Expected visits cannot start before the current expectation.',
+        ]);
+    }
+
+    if (
+        $currentGoal &&
+        $startDate->lt($currentGoal->start_date)
+    ) {
+        return back()->withErrors([
+            'start_date' =>
+                'Goal cannot start before the current goal.',
+        ]);
+    }
+
+    DB::transaction(function () use (
+        $member,
+        $visitsPerWeek,
+        $goal,
+        $startDate,
+        $currentExpectation,
+        $currentGoal,
+    ) {
+        $previousDay = $startDate->copy()->subDay();
+
+        /*
+         * Attendance expectation history
+         */
+        if ($currentExpectation) {
+            if (
+                $startDate->equalTo(
+                    $currentExpectation->start_date
+                )
+            ) {
+                if ($visitsPerWeek === null) {
+                    $currentExpectation->update([
+                        'end_date' => $previousDay->toDateString(),
+                    ]);
+                } else {
+                    $currentExpectation->update([
+                        'visits_per_week' => $visitsPerWeek,
+                    ]);
+                }
+            } else {
+                $currentExpectation->update([
+                    'end_date' => $previousDay->toDateString(),
+                ]);
+
+                if ($visitsPerWeek !== null) {
+                    $member->expectations()->create([
+                        'visits_per_week' => $visitsPerWeek,
+                        'start_date' => $startDate->toDateString(),
+                        'end_date' => null,
+                    ]);
+                }
+            }
+        } elseif ($visitsPerWeek !== null) {
+            $member->expectations()->create([
+                'visits_per_week' => $visitsPerWeek,
+                'start_date' => $startDate->toDateString(),
+                'end_date' => null,
+            ]);
+        }
+
+        /*
+         * Goal history
+         */
+        if ($currentGoal) {
+            if (
+                $startDate->equalTo(
+                    $currentGoal->start_date
+                )
+            ) {
+                if ($goal === null) {
+                    $currentGoal->update([
+                        'end_date' => $previousDay->toDateString(),
+                    ]);
+                } else {
+                    $currentGoal->update([
+                        'goal' => $goal,
+                    ]);
+                }
+            } else {
+                $currentGoal->update([
+                    'end_date' => $previousDay->toDateString(),
+                ]);
+
+                if ($goal !== null) {
+                    $member->goals()->create([
+                        'goal' => $goal,
+                        'start_date' => $startDate->toDateString(),
+                        'end_date' => null,
+                    ]);
+                }
+            }
+        } elseif ($goal !== null) {
+            $member->goals()->create([
+                'goal' => $goal,
+                'start_date' => $startDate->toDateString(),
+                'end_date' => null,
+            ]);
+        }
+    });
+
+    return redirect()
+        ->route('members.show', $member);
+}
+
     public function storeMembership(
         StoreMembershipRequest $request,
         Member $member,
@@ -796,62 +902,6 @@ class MemberController extends Controller
             ->route('members.show', $member);
     }
 
-    public function createPayment(
-        Member $member,
-        Membership $membership,
-    ): Response {
-        Gate::authorize('view', $member);
-
-        if ($membership->member_id !== $member->id) {
-            abort(404);
-        }
-
-        $methods = array_map(
-            fn (PaymentMethod $method) => [
-                'value' => $method->value,
-                'label' => $method->getLabel(),
-            ],
-            PaymentMethod::cases(),
-        );
-
-        return Inertia::render('Members/CreatePayment', [
-            'member' => [
-                'id' => $member->id,
-                'name' => $member->name,
-            ],
-            'membership' => [
-                'id' => $membership->id,
-                'status' => $membership->status,
-                'balance_due' => $membership->balanceDue(),
-            ],
-            'payment_methods' => $methods,
-        ]);
-    }
-
-    public function storePayment(
-        StorePaymentRequest $request,
-        Member $member,
-        Membership $membership,
-        PaymentService $paymentService,
-    ): RedirectResponse {
-        Gate::authorize('view', $member);
-
-        if ($membership->member_id !== $member->id) {
-            abort(404);
-        }
-
-        $paymentService->create(
-            $membership,
-            $request->input('amount'),
-            PaymentMethod::from(
-                $request->string('payment_method')->toString()
-            ),
-            Carbon::parse($request->input('paid_at')),
-        );
-
-        return redirect()
-            ->route('members.show', $member);
-    }
 
     public function storeAttendance(
         StoreAttendanceRequest $request,

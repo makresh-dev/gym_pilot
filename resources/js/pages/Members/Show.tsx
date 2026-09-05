@@ -7,6 +7,7 @@ import {
 } from 'lucide-react';
 import { dashboard } from '@/routes';
 import members from '@/routes/members';
+import FollowUpTaskPanel from '@/components/follow-up-task-panel';
 
 type Payment = {
     id: string;
@@ -168,9 +169,27 @@ type OperationalStatus = {
     balance_due: number;
 };
 
+type FollowUpTask = {
+    id: string;
+    member_id: string;
+    intervention_id: string | null;
+    status: 'pending' | 'completed' | 'skipped';
+    due_date: string;
+    completed_at: string | null;
+    completion_notes: string | null;
+    intervention?: {
+        id: string;
+        type: string;
+        notes: string | null;
+        outcome: string | null;
+        intervened_at: string | null;
+    } | null;
+};
+
 type ShowProps = {
     member: Member;
     operationalStatus: OperationalStatus;
+    followUpTasks: FollowUpTask[];
     checkedInToday: boolean;
     timeline: TimelineEvent[];
 };
@@ -680,6 +699,9 @@ type AttendanceSnapshot = {
     expectedVisitsPerWeek: number | null;
     trend: 'improving' | 'declining' | 'stable' | 'insufficient_data';
     lastVisit: string | null;
+    expectedVisitsInWindow: number | null;
+    adherencePercentage: number | null;
+    visitGap: number | null;
 };
 
 function getAttendanceSnapshot(
@@ -722,6 +744,20 @@ function getAttendanceSnapshot(
         }
     }
 
+    const expectedVisitsInWindow = expectedVisitsPerWeek === null
+        ? null
+        : expectedVisitsPerWeek * 2;
+
+    const adherencePercentage = expectedVisitsInWindow === null
+        ? null
+        : expectedVisitsInWindow === 0
+            ? 100
+            : Math.round((recentVisits / expectedVisitsInWindow) * 100);
+
+    const visitGap = expectedVisitsInWindow === null
+        ? null
+        : recentVisits - expectedVisitsInWindow;
+
     const lastVisit = attendances.length > 0
         ? attendances
             .slice()
@@ -738,6 +774,9 @@ function getAttendanceSnapshot(
         expectedVisitsPerWeek,
         trend,
         lastVisit,
+        expectedVisitsInWindow,
+        adherencePercentage,
+        visitGap,
     };
 }
 
@@ -771,6 +810,7 @@ function getAttendanceTrendPresentation(
 export default function Show({
     member,
     operationalStatus,
+    followUpTasks,
     checkedInToday,
     timeline,
 }: ShowProps) {
@@ -1521,13 +1561,18 @@ export default function Show({
 
                             <div className="rounded-lg border bg-muted/20 p-4">
                                 <p className="text-xs text-muted-foreground">
-                                    Expected
+                                    Expected (14 days)
                                 </p>
                                 <p className="mt-1 text-xl font-semibold">
-                                    {attendanceSnapshot.expectedVisitsPerWeek === null
+                                    {attendanceSnapshot.expectedVisitsInWindow === null
                                         ? 'Not set'
-                                        : `${attendanceSnapshot.expectedVisitsPerWeek} / week`}
+                                        : `${attendanceSnapshot.expectedVisitsInWindow} visits`}
                                 </p>
+                                {attendanceSnapshot.expectedVisitsPerWeek !== null && (
+                                    <p className="mt-1 text-xs text-muted-foreground">
+                                        {attendanceSnapshot.expectedVisitsPerWeek} / week
+                                    </p>
+                                )}
                             </div>
 
                             <div className="rounded-lg border bg-muted/20 p-4">
@@ -1541,6 +1586,40 @@ export default function Show({
                                 </p>
                             </div>
                         </div>
+
+                        {attendanceSnapshot.adherencePercentage !== null && (
+                            <div className="mt-4 rounded-lg border bg-muted/20 p-4">
+                                <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+                                    <div>
+                                        <p className="text-sm font-medium">
+                                            Attendance vs expectation
+                                        </p>
+                                        <p className="mt-1 text-xs text-muted-foreground">
+                                            Comparing the last 14 days with the member's current expected frequency.
+                                        </p>
+                                    </div>
+                                    <div className="text-left sm:text-right">
+                                        <p className="text-lg font-semibold">
+                                            {attendanceSnapshot.adherencePercentage}%
+                                        </p>
+                                        <p className="text-xs text-muted-foreground">
+                                            {attendanceSnapshot.recentVisits} of {attendanceSnapshot.expectedVisitsInWindow} visits
+                                        </p>
+                                    </div>
+                                </div>
+                            </div>
+                        )}
+
+                        {attendanceSnapshot.visitGap !== null && attendanceSnapshot.visitGap < 0 && (
+                            <div className="mt-3 rounded-lg border border-amber-500/30 bg-amber-500/5 p-4">
+                                <p className="text-sm font-medium text-amber-700 dark:text-amber-300">
+                                    {Math.abs(attendanceSnapshot.visitGap)} fewer visits than expected in the last 14 days.
+                                </p>
+                                <p className="mt-1 text-xs text-muted-foreground">
+                                    This is an attendance gap, not a diagnosis of disengagement. Review the member's context and any open signals before intervening.
+                                </p>
+                            </div>
+                        )}
 
                         {openSignals.some(
                             (signal) => signal.type === 'attendance_decline',
@@ -2248,6 +2327,15 @@ export default function Show({
                                 )
                             )}
                         </div>
+                    </section>
+
+                    {/* Persistent Follow-ups */}
+                    <section className="md:col-span-2">
+                        <FollowUpTaskPanel
+                            tasks={followUpTasks}
+                            memberId={member.id}
+                            title="Follow-ups"
+                        />
                     </section>
 
                     {/* Member-wide Intervention History */}

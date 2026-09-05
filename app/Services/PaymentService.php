@@ -17,12 +17,6 @@ class PaymentService
         PaymentMethod $paymentMethod,
         Carbon $paidAt,
     ): Payment {
-        if ($amount <= 0) {
-            throw new InvalidArgumentException(
-                'Payment amount must be greater than zero.'
-            );
-        }
-
         if (! $membership->exists) {
             throw new InvalidArgumentException(
                 'Membership does not exist.'
@@ -41,16 +35,22 @@ class PaymentService
             );
         }
 
+        if ($amount <= 0) {
+            throw new InvalidArgumentException(
+                'Payment amount must be greater than zero.'
+            );
+        }
+
         return DB::transaction(function () use (
             $membership,
             $amount,
             $paymentMethod,
             $paidAt,
-        ) {
+        ): Payment {
             /*
-             * Lock the membership before calculating the outstanding
-             * balance. This prevents concurrent payment requests from
-             * both using the same stale balance.
+             * Lock the membership before reading its balance. This keeps
+             * concurrent payment requests from both using the same stale
+             * outstanding amount.
              */
             $lockedMembership = Membership::query()
                 ->whereKey($membership->id)
@@ -60,6 +60,18 @@ class PaymentService
             if (! $lockedMembership) {
                 throw new InvalidArgumentException(
                     'Membership does not exist.'
+                );
+            }
+
+            if ($lockedMembership->member_id !== $membership->member_id) {
+                throw new InvalidArgumentException(
+                    'Membership ownership is invalid.'
+                );
+            }
+
+            if ($lockedMembership->organization_id !== $membership->organization_id) {
+                throw new InvalidArgumentException(
+                    'Membership organization is invalid.'
                 );
             }
 
