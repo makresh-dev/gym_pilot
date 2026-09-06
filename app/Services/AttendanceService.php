@@ -9,9 +9,24 @@ use RuntimeException;
 
 class AttendanceService
 {
-    public function checkIn(Member $member): Attendance
-    {
-        return DB::transaction(function () use ($member) {
+    /**
+     * Check a member in.
+     *
+     * Existing callers continue to use "manual" as the default source.
+     *
+     * Supported sources currently include:
+     *
+     * - manual
+     * - qr
+     */
+    public function checkIn(
+        Member $member,
+        string $source = 'manual'
+    ): Attendance {
+        return DB::transaction(function () use (
+            $member,
+            $source
+        ) {
             $member = Member::query()
                 ->whereKey($member->id)
                 ->where(
@@ -30,7 +45,10 @@ class AttendanceService
                     'member_id',
                     $member->id
                 )
-                ->whereDate('check_in_at', today())
+                ->whereDate(
+                    'check_in_at',
+                    today()
+                )
                 ->exists();
 
             if ($alreadyCheckedIn) {
@@ -53,7 +71,7 @@ class AttendanceService
                 'organization_id' => $member->organization_id,
                 'member_id' => $member->id,
                 'check_in_at' => now(),
-                'source' => 'manual',
+                'source' => $source,
             ]);
         });
     }

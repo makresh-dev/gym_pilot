@@ -89,6 +89,12 @@ Route::middleware(['auth'])->group(function () {
     )->name('members.context.update');
 
 
+    Route::post(
+        'members/{member}/mobile-access',
+        [MemberController::class, 'enableMobileAccess']
+    )->name('members.mobile-access.enable');    
+
+
 
     /*
     |--------------------------------------------------------------------------

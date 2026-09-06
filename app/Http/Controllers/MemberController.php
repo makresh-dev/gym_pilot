@@ -15,6 +15,7 @@ use App\Http\Requests\UpdateMemberRequest;
 use App\Models\Attendance;
 use App\Models\FollowUpTask;
 use App\Models\Member;
+use App\Models\MemberAccount;
 use App\Models\Membership;
 use App\Models\MembershipPlan;
 use App\Models\Signal;
@@ -28,6 +29,7 @@ use App\Services\PaymentService;
 use Carbon\Carbon;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Gate;
 use Inertia\Inertia;
 use Inertia\Response;
@@ -625,6 +627,39 @@ class MemberController extends Controller
             ->route('members.index');
     }
 
+    public function enableMobileAccess(
+        Request $request,
+        Member $member,
+    ): RedirectResponse {
+        Gate::authorize('update', $member);
+
+        $validated = $request->validate([
+            'password' => [
+                'required',
+                'string',
+                'min:8',
+                'max:255',
+            ],
+        ]);
+
+        if ($member->account()->exists()) {
+            return back()->withErrors([
+                'mobile_access' =>
+                    'Mobile access is already enabled for this member.',
+            ]);
+        }
+
+        MemberAccount::create([
+            'member_id' => $member->id,
+            'password' => $validated['password'],
+        ]);
+
+        return back()->with(
+            'success',
+            'Mobile access enabled successfully.'
+        );
+    }
+
     public function createMembership(Member $member): Response
     {
         Gate::authorize('view', $member);
@@ -659,205 +694,216 @@ class MemberController extends Controller
     }
 
     public function editContext(Member $member): Response
-{
-    Gate::authorize('update', $member);
+    {
+        Gate::authorize('update', $member);
 
-    $today = Carbon::today();
+        $today = Carbon::today();
 
-    $currentExpectation = $member->expectations()
-        ->whereDate('start_date', '<=', $today)
-        ->where(function ($query) use ($today) {
-            $query
-                ->whereNull('end_date')
-                ->orWhereDate('end_date', '>=', $today);
-        })
-        ->latest('start_date')
-        ->first();
+        $currentExpectation = $member->expectations()
+            ->whereDate('start_date', '<=', $today)
+            ->where(function ($query) use ($today) {
+                $query
+                    ->whereNull('end_date')
+                    ->orWhereDate('end_date', '>=', $today);
+            })
+            ->latest('start_date')
+            ->first();
 
-    $currentGoal = $member->goals()
-        ->whereDate('start_date', '<=', $today)
-        ->where(function ($query) use ($today) {
-            $query
-                ->whereNull('end_date')
-                ->orWhereDate('end_date', '>=', $today);
-        })
-        ->latest('start_date')
-        ->first();
+        $currentGoal = $member->goals()
+            ->whereDate('start_date', '<=', $today)
+            ->where(function ($query) use ($today) {
+                $query
+                    ->whereNull('end_date')
+                    ->orWhereDate('end_date', '>=', $today);
+            })
+            ->latest('start_date')
+            ->first();
 
-    return Inertia::render('Members/EditContext', [
-        'member' => [
-            'id' => $member->id,
-            'name' => $member->name,
-            'phone' => $member->phone,
-        ],
-        'currentExpectation' => $currentExpectation,
-        'currentGoal' => $currentGoal,
-    ]);
-}
-
-public function updateContext(
-    Request $request,
-    Member $member,
-): RedirectResponse {
-    Gate::authorize('update', $member);
-
-    $validated = $request->validate([
-        'visits_per_week' => [
-            'nullable',
-            'integer',
-            'min:1',
-            'max:7',
-        ],
-        'goal' => [
-            'nullable',
-            'string',
-            'max:100',
-        ],
-        'start_date' => [
-            'required',
-            'date',
-            'before_or_equal:today',
-        ],
-    ]);
-
-    $visitsPerWeek = $validated['visits_per_week'] ?? null;
-
-    $goal = filled($validated['goal'] ?? null)
-        ? trim($validated['goal'])
-        : null;
-
-    if ($visitsPerWeek === null && $goal === null) {
-        return back()->withErrors([
-            'context' => 'Set an expected visit frequency or a goal.',
+        return Inertia::render('Members/EditContext', [
+            'member' => [
+                'id' => $member->id,
+                'name' => $member->name,
+                'phone' => $member->phone,
+            ],
+            'currentExpectation' => $currentExpectation,
+            'currentGoal' => $currentGoal,
         ]);
     }
 
-    $startDate = Carbon::parse(
-        $validated['start_date']
-    )->startOfDay();
+    public function updateContext(
+        Request $request,
+        Member $member,
+    ): RedirectResponse {
+        Gate::authorize('update', $member);
 
-    $currentExpectation = $member->expectations()
-        ->whereNull('end_date')
-        ->latest('start_date')
-        ->first();
-
-    $currentGoal = $member->goals()
-        ->whereNull('end_date')
-        ->latest('start_date')
-        ->first();
-
-    if (
-        $currentExpectation &&
-        $startDate->lt($currentExpectation->start_date)
-    ) {
-        return back()->withErrors([
-            'start_date' =>
-                'Expected visits cannot start before the current expectation.',
+        $validated = $request->validate([
+            'visits_per_week' => [
+                'nullable',
+                'integer',
+                'min:1',
+                'max:7',
+            ],
+            'goal' => [
+                'nullable',
+                'string',
+                'max:100',
+            ],
+            'start_date' => [
+                'required',
+                'date',
+                'before_or_equal:today',
+            ],
         ]);
-    }
 
-    if (
-        $currentGoal &&
-        $startDate->lt($currentGoal->start_date)
-    ) {
-        return back()->withErrors([
-            'start_date' =>
-                'Goal cannot start before the current goal.',
-        ]);
-    }
+        $visitsPerWeek = $validated['visits_per_week'] ?? null;
 
-    DB::transaction(function () use (
-        $member,
-        $visitsPerWeek,
-        $goal,
-        $startDate,
-        $currentExpectation,
-        $currentGoal,
-    ) {
-        $previousDay = $startDate->copy()->subDay();
+        $goal = filled($validated['goal'] ?? null)
+            ? trim($validated['goal'])
+            : null;
 
-        /*
-         * Attendance expectation history
-         */
-        if ($currentExpectation) {
-            if (
-                $startDate->equalTo(
-                    $currentExpectation->start_date
-                )
-            ) {
-                if ($visitsPerWeek === null) {
-                    $currentExpectation->update([
-                        'end_date' => $previousDay->toDateString(),
-                    ]);
-                } else {
-                    $currentExpectation->update([
-                        'visits_per_week' => $visitsPerWeek,
-                    ]);
-                }
-            } else {
-                $currentExpectation->update([
-                    'end_date' => $previousDay->toDateString(),
-                ]);
-
-                if ($visitsPerWeek !== null) {
-                    $member->expectations()->create([
-                        'visits_per_week' => $visitsPerWeek,
-                        'start_date' => $startDate->toDateString(),
-                        'end_date' => null,
-                    ]);
-                }
-            }
-        } elseif ($visitsPerWeek !== null) {
-            $member->expectations()->create([
-                'visits_per_week' => $visitsPerWeek,
-                'start_date' => $startDate->toDateString(),
-                'end_date' => null,
+        if ($visitsPerWeek === null && $goal === null) {
+            return back()->withErrors([
+                'context' =>
+                    'Set an expected visit frequency or a goal.',
             ]);
         }
 
-        /*
-         * Goal history
-         */
-        if ($currentGoal) {
-            if (
-                $startDate->equalTo(
-                    $currentGoal->start_date
-                )
-            ) {
-                if ($goal === null) {
-                    $currentGoal->update([
-                        'end_date' => $previousDay->toDateString(),
-                    ]);
-                } else {
-                    $currentGoal->update([
-                        'goal' => $goal,
-                    ]);
-                }
-            } else {
-                $currentGoal->update([
-                    'end_date' => $previousDay->toDateString(),
-                ]);
+        $startDate = Carbon::parse(
+            $validated['start_date']
+        )->startOfDay();
 
-                if ($goal !== null) {
-                    $member->goals()->create([
-                        'goal' => $goal,
-                        'start_date' => $startDate->toDateString(),
-                        'end_date' => null,
-                    ]);
-                }
-            }
-        } elseif ($goal !== null) {
-            $member->goals()->create([
-                'goal' => $goal,
-                'start_date' => $startDate->toDateString(),
-                'end_date' => null,
+        $currentExpectation = $member->expectations()
+            ->whereNull('end_date')
+            ->latest('start_date')
+            ->first();
+
+        $currentGoal = $member->goals()
+            ->whereNull('end_date')
+            ->latest('start_date')
+            ->first();
+
+        if (
+            $currentExpectation &&
+            $startDate->lt($currentExpectation->start_date)
+        ) {
+            return back()->withErrors([
+                'start_date' =>
+                    'Expected visits cannot start before the current expectation.',
             ]);
         }
-    });
 
-    return redirect()
-        ->route('members.show', $member);
-}
+        if (
+            $currentGoal &&
+            $startDate->lt($currentGoal->start_date)
+        ) {
+            return back()->withErrors([
+                'start_date' =>
+                    'Goal cannot start before the current goal.',
+            ]);
+        }
+
+        DB::transaction(function () use (
+            $member,
+            $visitsPerWeek,
+            $goal,
+            $startDate,
+            $currentExpectation,
+            $currentGoal,
+        ) {
+            $previousDay = $startDate->copy()->subDay();
+
+            /*
+             * Attendance expectation history
+             */
+            if ($currentExpectation) {
+                if (
+                    $startDate->equalTo(
+                        $currentExpectation->start_date
+                    )
+                ) {
+                    if ($visitsPerWeek === null) {
+                        $currentExpectation->update([
+                            'end_date' =>
+                                $previousDay->toDateString(),
+                        ]);
+                    } else {
+                        $currentExpectation->update([
+                            'visits_per_week' =>
+                                $visitsPerWeek,
+                        ]);
+                    }
+                } else {
+                    $currentExpectation->update([
+                        'end_date' =>
+                            $previousDay->toDateString(),
+                    ]);
+
+                    if ($visitsPerWeek !== null) {
+                        $member->expectations()->create([
+                            'visits_per_week' =>
+                                $visitsPerWeek,
+                            'start_date' =>
+                                $startDate->toDateString(),
+                            'end_date' => null,
+                        ]);
+                    }
+                }
+            } elseif ($visitsPerWeek !== null) {
+                $member->expectations()->create([
+                    'visits_per_week' => $visitsPerWeek,
+                    'start_date' =>
+                        $startDate->toDateString(),
+                    'end_date' => null,
+                ]);
+            }
+
+            /*
+             * Goal history
+             */
+            if ($currentGoal) {
+                if (
+                    $startDate->equalTo(
+                        $currentGoal->start_date
+                    )
+                ) {
+                    if ($goal === null) {
+                        $currentGoal->update([
+                            'end_date' =>
+                                $previousDay->toDateString(),
+                        ]);
+                    } else {
+                        $currentGoal->update([
+                            'goal' => $goal,
+                        ]);
+                    }
+                } else {
+                    $currentGoal->update([
+                        'end_date' =>
+                            $previousDay->toDateString(),
+                    ]);
+
+                    if ($goal !== null) {
+                        $member->goals()->create([
+                            'goal' => $goal,
+                            'start_date' =>
+                                $startDate->toDateString(),
+                            'end_date' => null,
+                        ]);
+                    }
+                }
+            } elseif ($goal !== null) {
+                $member->goals()->create([
+                    'goal' => $goal,
+                    'start_date' =>
+                        $startDate->toDateString(),
+                    'end_date' => null,
+                ]);
+            }
+        });
+
+        return redirect()
+            ->route('members.show', $member);
+    }
 
     public function storeMembership(
         StoreMembershipRequest $request,
@@ -901,7 +947,6 @@ public function updateContext(
         return redirect()
             ->route('members.show', $member);
     }
-
 
     public function storeAttendance(
         StoreAttendanceRequest $request,
@@ -975,7 +1020,7 @@ public function updateContext(
             ],
             'plans' => $plans,
             'payment_methods' => $paymentMethods,
-            'suggested_start_date' => $suggestedStartDate->toDateString(),
+            'suggested_start_date' => $suggestedStartDate,
         ]);
     }
 

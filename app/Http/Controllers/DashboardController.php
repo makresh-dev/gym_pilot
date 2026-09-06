@@ -6,9 +6,9 @@ use App\Models\Attendance;
 use App\Models\FollowUpTask;
 use App\Models\Member;
 use App\Models\Membership;
+use App\Models\Organization;
 use App\Models\Signal;
 use App\Services\Intelligence\ActionRecommendationService;
-use Carbon\Carbon;
 use Inertia\Inertia;
 use Inertia\Response;
 
@@ -20,6 +20,14 @@ class DashboardController extends Controller
         $user = auth()->user();
 
         $organizationId = $user->organization_id;
+
+        $organization = Organization::query()
+            ->select([
+                'id',
+                'name',
+                'attendance_qr_token',
+            ])
+            ->findOrFail($organizationId);
 
         $today = today();
 
@@ -203,17 +211,26 @@ class DashboardController extends Controller
         };
 
         $overdueFollowUps = $followUpTasks
-            ->filter(fn (FollowUpTask $task) => $task->due_date->isBefore($today))
+            ->filter(
+                fn (FollowUpTask $task) =>
+                    $task->due_date->isBefore($today)
+            )
             ->map($formatFollowUpTask)
             ->values();
 
         $todayFollowUps = $followUpTasks
-            ->filter(fn (FollowUpTask $task) => $task->due_date->isSameDay($today))
+            ->filter(
+                fn (FollowUpTask $task) =>
+                    $task->due_date->isSameDay($today)
+            )
             ->map($formatFollowUpTask)
             ->values();
 
         $upcomingFollowUps = $followUpTasks
-            ->filter(fn (FollowUpTask $task) => $task->due_date->isAfter($today))
+            ->filter(
+                fn (FollowUpTask $task) =>
+                    $task->due_date->isAfter($today)
+            )
             ->map($formatFollowUpTask)
             ->values();
 
@@ -226,7 +243,10 @@ class DashboardController extends Controller
          */
 
         $highPrioritySignals = $signals
-            ->filter(fn (array $signal) => $signal['severity'] === 'high')
+            ->filter(
+                fn (array $signal) =>
+                    $signal['severity'] === 'high'
+            )
             ->values();
 
         /*
@@ -261,6 +281,33 @@ class DashboardController extends Controller
             ],
         ];
 
+        /*
+         * ------------------------------------------------------------------
+         * GymPilot attendance QR
+         * ------------------------------------------------------------------
+         *
+         * The QR identifies the gym only.
+         *
+         * It does not contain:
+         *   - member ID
+         *   - email
+         *   - phone number
+         *   - other member information
+         *
+         * The mobile app will identify the member through authentication.
+         */
+
+        $attendanceQr = [
+            'organization_id' => $organization->id,
+
+            'organization_name' => $organization->name,
+
+            'payload' => sprintf(
+                'gympilot://check-in/%s',
+                $organization->attendance_qr_token
+            ),
+        ];
+
         return Inertia::render('dashboard', [
             'stats' => [
                 'active_members' => $activeMembers,
@@ -284,6 +331,8 @@ class DashboardController extends Controller
                 ->values(),
 
             'dailyWorkQueue' => $dailyWorkQueue,
+
+            'attendanceQr' => $attendanceQr,
         ]);
     }
 }

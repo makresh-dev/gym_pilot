@@ -1,5 +1,6 @@
 import { Head, Link, router } from '@inertiajs/react';
-import { useState } from 'react';
+import { QRCodeSVG } from 'qrcode.react';
+import { useState, type ReactNode } from 'react';
 import { dashboard } from '@/routes';
 
 type DashboardStats = {
@@ -102,11 +103,18 @@ type DailyWorkQueue = {
     };
 };
 
+type AttendanceQr = {
+    organization_id: string;
+    organization_name: string;
+    payload: string;
+};
+
 type DashboardProps = {
     stats: DashboardStats;
     signals: Signal[];
     followUpTasks: FollowUpTask[];
     dailyWorkQueue: DailyWorkQueue;
+    attendanceQr: AttendanceQr;
 };
 
 type InterventionType =
@@ -202,6 +210,7 @@ export default function Dashboard({
     signals,
     followUpTasks,
     dailyWorkQueue,
+    attendanceQr,
 }: DashboardProps) {
     const workQueueCount =
         dailyWorkQueue.overdue.count +
@@ -303,6 +312,54 @@ export default function Dashboard({
                         action="Review signals"
                     />
                 </div>
+
+                {/* GymPilot check-in QR */}
+                <section className="rounded-xl border p-5">
+                    <div className="flex flex-col gap-6 lg:flex-row lg:items-center lg:justify-between">
+                        <div className="min-w-0">
+                            <h2 className="text-lg font-semibold">
+                                GymPilot Check-in QR
+                            </h2>
+
+                            <p className="mt-1 max-w-2xl text-sm text-muted-foreground">
+                                Display this QR code at your gym entrance so members
+                                can scan it with the GymPilot mobile app to check in.
+                            </p>
+
+                            <div className="mt-5 rounded-lg bg-muted/40 p-4">
+                                <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+                                    Gym
+                                </p>
+
+                                <p className="mt-1 text-base font-medium">
+                                    {attendanceQr.organization_name}
+                                </p>
+
+                                <p className="mt-3 break-all font-mono text-xs text-muted-foreground">
+                                    {attendanceQr.payload}
+                                </p>
+                            </div>
+
+                            <div className="mt-4 flex flex-wrap gap-2">
+                                <button
+                                    type="button"
+                                    onClick={() => window.print()}
+                                    className="rounded-md bg-primary px-3 py-2 text-sm font-medium text-primary-foreground"
+                                >
+                                    Print QR
+                                </button>
+                            </div>
+                        </div>
+
+                        <div className="flex shrink-0 justify-center rounded-xl border bg-white p-5">
+                            <QRCodeSVG
+                                value={attendanceQr.payload}
+                                size={220}
+                                includeMargin
+                            />
+                        </div>
+                    </div>
+                </section>
 
                 {/* Financial summary */}
                 <Link
@@ -527,7 +584,7 @@ type WorkQueueColumnProps = {
     description: string;
     count: number;
     tone: 'overdue' | 'today' | 'upcoming';
-    children: React.ReactNode;
+    children: ReactNode;
 };
 
 function WorkQueueColumn({
