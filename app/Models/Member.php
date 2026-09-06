@@ -68,4 +68,9 @@ class Member extends Model
     {
         return $this->hasMany(Signal::class);
     }
+
+    public function payments(): HasMany
+    {
+        return $this->hasMany(Payment::class);
+    }
 }

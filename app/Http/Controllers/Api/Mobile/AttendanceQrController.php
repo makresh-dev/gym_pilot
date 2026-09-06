@@ -17,12 +17,6 @@ class AttendanceQrController extends Controller
     ) {
     }
 
-    /**
-     * Resolve a GymPilot attendance QR token.
-     *
-     * This endpoint only identifies the gym.
-     * It does not authenticate a member or mark attendance.
-     */
     public function show(string $token): JsonResponse
     {
         $organization = Organization::query()
@@ -42,27 +36,15 @@ class AttendanceQrController extends Controller
         ]);
     }
 
-    /**
-     * Mark attendance for the authenticated member using a gym QR token.
-     *
-     * The QR identifies the gym.
-     * Sanctum identifies the member.
-     *
-     * AttendanceService remains the single authority for attendance rules.
-     */
     public function checkIn(Request $request): JsonResponse
     {
         $validated = $request->validate([
-            'token' => [
-                'required',
-                'string',
-                'size:64',
-            ],
+            'token' => ['required', 'string', 'size:64'],
         ]);
 
-        $account = $request->user();
+        $account = $this->resolveMemberAccount($request);
 
-        if (! $account instanceof MemberAccount) {
+        if (! $account) {
             return response()->json([
                 'message' => 'Invalid member authentication.',
             ], 401);
@@ -115,5 +97,70 @@ class AttendanceQrController extends Controller
                 'name' => $organization->name,
             ],
         ]);
+    }
+
+    public function history(Request $request): JsonResponse
+    {
+        $account = $this->resolveMemberAccount($request);
+
+        if (! $account) {
+            return response()->json([
+                'message' => 'Invalid member authentication.',
+            ], 401);
+        }
+
+        $member = $account->member;
+
+        if (! $member) {
+            return response()->json([
+                'message' => 'Member account is not linked to a member.',
+            ], 401);
+        }
+
+        $today = today();
+
+        $todayAttendance = $member->attendances()
+            ->whereDate('check_in_at', $today)
+            ->latest('check_in_at')
+            ->first();
+
+        $attendances = $member->attendances()
+            ->latest('check_in_at')
+            ->limit(30)
+            ->get([
+                'id',
+                'check_in_at',
+                'source',
+            ]);
+
+        return response()->json([
+            'checked_in_today' => $todayAttendance !== null,
+            'today_check_in_at' => $todayAttendance?->check_in_at,
+            'attendances' => $attendances,
+        ]);
+    }
+
+    private function resolveMemberAccount(
+        Request $request,
+    ): ?MemberAccount {
+        $user = $request->user();
+
+        if ($user instanceof MemberAccount) {
+            return $user->loadMissing('member');
+        }
+
+        $token = $user?->currentAccessToken();
+
+        if (! $token) {
+            return null;
+        }
+
+        $tokenable = $token->tokenable;
+
+        if (! $tokenable instanceof MemberAccount) {
+            return null;
+        }
+
+        return $tokenable->loadMissing('member');
     }
 }
