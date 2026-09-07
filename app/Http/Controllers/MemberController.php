@@ -1010,8 +1010,8 @@ class MemberController extends Controller
             ],
             'membership' => [
                 'id' => $membership->id,
-                'start_date' => $membership->start_date,
-                'end_date' => $membership->end_date,
+                'start_date' => $membership->start_date?->toDateString(),
+                'end_date' => $membership->end_date?->toDateString(),
                 'price' => $membership->price,
                 'lifecycle_status' => $membership->lifecycle_status,
                 'membership_plan' => [
@@ -1020,7 +1020,7 @@ class MemberController extends Controller
             ],
             'plans' => $plans,
             'payment_methods' => $paymentMethods,
-            'suggested_start_date' => $suggestedStartDate,
+            'suggested_start_date' => $suggestedStartDate->toDateString(),
         ]);
     }
 

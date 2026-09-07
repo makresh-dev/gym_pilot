@@ -52,6 +52,28 @@ type PaymentMethod = {
     label: string;
 };
 
+function parseDateOnly(date: string): Date {
+    const dateOnly = date.slice(0, 10);
+    return new Date(`${dateOnly}T00:00:00`);
+}
+
+function formatDate(date: string | Date | null | undefined): string {
+    if (!date) {
+        return '—';
+    }
+
+    const d = typeof date === 'string' ? parseDateOnly(date) : date;
+    if (isNaN(d.getTime())) {
+        return '—';
+    }
+
+    return d.toLocaleDateString('en-IN', {
+        day: '2-digit',
+        month: 'short',
+        year: 'numeric',
+    });
+}
+
 type RenewMembershipProps = {
     member: Member;
     membership: Membership;
@@ -67,17 +89,17 @@ export default function RenewMembership({
     payment_methods,
     suggested_start_date,
 }: RenewMembershipProps) {
+    const initialStartDate = suggested_start_date ? suggested_start_date.slice(0, 10) : '';
+
     const now = new Date();
-    const defaultPaidAt = [
-        now.toISOString().split('T')[0],
-        now.toTimeString().slice(0, 5),
-    ].join('T');
+    const localNow = new Date(now.getTime() - now.getTimezoneOffset() * 60000);
+    const defaultPaidAt = localNow.toISOString().slice(0, 16);
 
     const [payNow, setPayNow] = React.useState(false);
 
     const { data, setData, post, processing, errors } = useForm({
         membership_plan_id: '',
-        start_date: suggested_start_date,
+        start_date: initialStartDate,
         payment: false,
         payment_amount: '',
         payment_method: '',
@@ -87,6 +109,19 @@ export default function RenewMembership({
     const selectedPlan = plans.find(
         (plan) => plan.id === data.membership_plan_id,
     );
+
+    const startDate = data.start_date ? parseDateOnly(data.start_date) : null;
+    const endDate =
+        selectedPlan && startDate && !isNaN(startDate.getTime())
+            ? new Date(
+                startDate.getTime() +
+                (selectedPlan.duration_days - 1) *
+                24 *
+                60 *
+                60 *
+                1000,
+            )
+            : null;
 
     const selectedPlanPrice = selectedPlan ? Number(selectedPlan.price) : 0;
     const paymentAmount = Number(data.payment_amount || 0);
@@ -167,11 +202,11 @@ export default function RenewMembership({
                             <CardContent className="grid grid-cols-2 gap-3 text-xs">
                                 <div>
                                     <span className="text-muted-foreground">Started: </span>
-                                    <span className="font-medium">{membership.start_date}</span>
+                                    <span className="font-medium">{formatDate(membership.start_date)}</span>
                                 </div>
                                 <div>
                                     <span className="text-muted-foreground">Expires: </span>
-                                    <span className="font-medium">{membership.end_date}</span>
+                                    <span className="font-medium">{formatDate(membership.end_date)}</span>
                                 </div>
                             </CardContent>
                         </Card>
@@ -369,8 +404,14 @@ export default function RenewMembership({
                                 </div>
                                 <div className="flex justify-between">
                                     <span className="text-muted-foreground">Start Date</span>
-                                    <span className="font-medium">{data.start_date || '—'}</span>
+                                    <span className="font-medium">{formatDate(data.start_date)}</span>
                                 </div>
+                                {endDate && (
+                                    <div className="flex justify-between">
+                                        <span className="text-muted-foreground">End Date</span>
+                                        <span className="font-medium">{formatDate(endDate)}</span>
+                                    </div>
+                                )}
 
                                 <div className="my-1 border-t" />
 
