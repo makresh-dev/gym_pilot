@@ -281,7 +281,7 @@ export default function Welcome() {
                     <div className="mx-auto flex h-14 max-w-6xl items-center justify-between px-4 sm:px-6 lg:px-8">
                         <div className="flex items-center gap-3">
                             <img
-                                src="/images/gympilot-logo.png"
+                                src="/images/gympilot-icon.png"
                                 alt="GymPilot Logo"
                                 className="size-9 rounded-xl object-contain shadow-xs border border-border/60 bg-white dark:bg-card p-0.5"
                             />
@@ -325,7 +325,7 @@ export default function Welcome() {
                                 <div className="relative mb-5 flex items-center justify-center">
                                     <div className="absolute -inset-4 rounded-full bg-emerald-500/20 blur-2xl dark:bg-emerald-500/15" />
                                     <img
-                                        src="/images/gympilot-logo.png"
+                                        src="/images/gympilot-icon.png"
                                         alt="GymPilot Smart Fitness Technology"
                                         className="relative size-28 sm:size-32 rounded-3xl object-contain shadow-lg border border-border/80 bg-white dark:bg-card p-2 transition-transform duration-300 hover:scale-105"
                                     />
@@ -578,7 +578,7 @@ export default function Welcome() {
                     <div className="mx-auto flex max-w-6xl flex-col sm:flex-row items-center justify-between gap-4 px-4 sm:px-6 lg:px-8">
                         <div className="flex items-center gap-2.5">
                             <img
-                                src="/images/gympilot-logo.png"
+                                src="/images/gympilot-icon.png"
                                 alt="GymPilot"
                                 className="size-6 rounded-md object-contain border border-border/60 bg-white dark:bg-card p-0.5"
                             />

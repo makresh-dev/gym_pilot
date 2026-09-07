@@ -19,7 +19,7 @@ export default function AuthSplitLayout({
                     className="relative z-20 flex items-center text-lg font-bold"
                 >
                     <img
-                        src="/images/gympilot-logo.png"
+                        src="/images/gympilot-icon.png"
                         alt="GymPilot"
                         className="mr-2.5 size-8 rounded-xl object-contain border border-white/20 bg-white p-0.5 shadow-xs"
                     />
@@ -33,7 +33,7 @@ export default function AuthSplitLayout({
                         className="relative z-20 flex items-center justify-center lg:hidden"
                     >
                         <img
-                            src="/images/gympilot-logo.png"
+                            src="/images/gympilot-icon.png"
                             alt="GymPilot"
                             className="size-14 rounded-2xl object-contain border border-border/80 bg-white dark:bg-card p-1 shadow-xs"
                         />

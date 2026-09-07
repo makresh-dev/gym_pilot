@@ -7,14 +7,14 @@ export default function AppLogo() {
 
     return (
         <>
-            <div className="flex aspect-square size-8 items-center justify-center rounded-xl overflow-hidden shadow-xs border border-border/70 bg-white dark:bg-card p-0.5">
+            <div className="flex aspect-square size-8 shrink-0 items-center justify-center rounded-xl overflow-hidden shadow-xs border border-border/70 bg-white dark:bg-card p-0.5 transition-all">
                 <img
-                    src="/images/gympilot-logo.png"
+                    src="/images/gympilot-icon.png"
                     alt="GymPilot"
                     className="size-full object-contain"
                 />
             </div>
-            <div className="ml-1.5 grid flex-1 text-left text-sm">
+            <div className="ml-1.5 grid flex-1 text-left text-sm group-data-[collapsible=icon]:hidden">
                 <span className="mb-0.5 truncate leading-tight font-semibold tracking-tight text-foreground">
                     {name}
                 </span>

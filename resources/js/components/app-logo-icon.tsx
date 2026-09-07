@@ -7,9 +7,9 @@ export default function AppLogoIcon({
 }: ImgHTMLAttributes<HTMLImageElement>) {
     return (
         <img
-            src="/images/gympilot-logo.png"
+            src="/images/gympilot-icon.png"
             alt="GymPilot"
-            className={cn('object-contain rounded-xl', className)}
+            className={cn('object-contain', className)}
             {...props}
         />
     );

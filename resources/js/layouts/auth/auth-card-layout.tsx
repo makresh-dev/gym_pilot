@@ -29,7 +29,7 @@ export default function AuthCardLayout({
                     <div className="relative flex items-center justify-center">
                         <div className="absolute -inset-2 rounded-full bg-emerald-500/20 blur-lg dark:bg-emerald-500/10" />
                         <img
-                            src="/images/gympilot-logo.png"
+                            src="/images/gympilot-icon.png"
                             alt="GymPilot"
                             className="relative size-14 rounded-2xl object-contain border border-border/80 bg-white dark:bg-card p-1 shadow-xs transition-transform duration-200 group-hover:scale-105"
                         />
