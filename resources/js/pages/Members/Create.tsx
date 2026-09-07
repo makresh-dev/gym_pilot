@@ -1,5 +1,20 @@
 import { Head, Link, useForm } from '@inertiajs/react';
+import { ArrowLeft, UserPlus } from 'lucide-react';
 import type { FormEvent } from 'react';
+import InputError from '@/components/input-error';
+import { Button } from '@/components/ui/button';
+import {
+    Card,
+    CardContent,
+    CardDescription,
+    CardFooter,
+    CardHeader,
+    CardTitle,
+} from '@/components/ui/card';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import { Spinner } from '@/components/ui/spinner';
+import members from '@/routes/members';
 
 type MemberForm = {
     name: string;
@@ -18,7 +33,6 @@ export default function Create() {
 
     const submit = (event: FormEvent<HTMLFormElement>) => {
         event.preventDefault();
-
         post('/members');
     };
 
@@ -26,148 +40,109 @@ export default function Create() {
         <>
             <Head title="Add Member" />
 
-            <div className="mx-auto max-w-2xl p-6">
-                <div className="mb-6">
-                    <Link
-                        href="/members"
-                        className="text-sm text-muted-foreground hover:underline"
-                    >
-                        ← Back to Members
-                    </Link>
+            <div className="flex h-full flex-1 flex-col gap-6 p-6">
+                <div>
+                    <Button variant="ghost" size="sm" asChild className="-ml-3 mb-2 text-muted-foreground">
+                        <Link href={members.index()}>
+                            <ArrowLeft data-icon="inline-start" className="size-4" />
+                            Back to Members
+                        </Link>
+                    </Button>
 
-                    <h1 className="mt-4 text-2xl font-semibold">
-                        Add Member
-                    </h1>
-
+                    <h1 className="text-2xl font-bold tracking-tight">Add Member</h1>
                     <p className="mt-1 text-sm text-muted-foreground">
-                        Add a new member to your gym.
+                        Register a new gym member to start tracking workouts and memberships.
                     </p>
                 </div>
 
-                <form
-                    onSubmit={submit}
-                    className="space-y-5 rounded-lg border p-6"
-                >
-                    <div>
-                        <label
-                            htmlFor="name"
-                            className="mb-2 block text-sm font-medium"
-                        >
-                            Name
-                        </label>
+                <div className="max-w-2xl">
+                    <Card>
+                        <form onSubmit={submit}>
+                            <CardHeader>
+                                <CardTitle className="text-lg">Personal Details</CardTitle>
+                                <CardDescription>
+                                    Essential profile details for identification, contact, and check-in.
+                                </CardDescription>
+                            </CardHeader>
 
-                        <input
-                            id="name"
-                            type="text"
-                            value={data.name}
-                            onChange={(event) =>
-                                setData('name', event.target.value)
-                            }
-                            className="w-full rounded-md border px-3 py-2"
-                        />
+                            <CardContent className="flex flex-col gap-5">
+                                <div className="flex flex-col gap-2">
+                                    <Label htmlFor="name">Full Name</Label>
+                                    <Input
+                                        id="name"
+                                        type="text"
+                                        value={data.name}
+                                        onChange={(event) =>
+                                            setData('name', event.target.value)
+                                        }
+                                        placeholder="e.g. John Doe"
+                                        required
+                                        autoFocus
+                                    />
+                                    <InputError message={errors.name} />
+                                </div>
 
-                        {errors.name && (
-                            <p className="mt-1 text-sm text-destructive">
-                                {errors.name}
-                            </p>
-                        )}
-                    </div>
+                                <div className="grid gap-5 sm:grid-cols-2">
+                                    <div className="flex flex-col gap-2">
+                                        <Label htmlFor="phone">Phone Number</Label>
+                                        <Input
+                                            id="phone"
+                                            type="tel"
+                                            value={data.phone}
+                                            onChange={(event) =>
+                                                setData('phone', event.target.value)
+                                            }
+                                            placeholder="+91 98765 43210"
+                                            required
+                                        />
+                                        <InputError message={errors.phone} />
+                                    </div>
 
-                    <div>
-                        <label
-                            htmlFor="phone"
-                            className="mb-2 block text-sm font-medium"
-                        >
-                            Phone
-                        </label>
+                                    <div className="flex flex-col gap-2">
+                                        <Label htmlFor="email">Email Address (Optional)</Label>
+                                        <Input
+                                            id="email"
+                                            type="email"
+                                            value={data.email}
+                                            onChange={(event) =>
+                                                setData('email', event.target.value)
+                                            }
+                                            placeholder="john@example.com"
+                                        />
+                                        <InputError message={errors.email} />
+                                    </div>
+                                </div>
 
-                        <input
-                            id="phone"
-                            type="tel"
-                            value={data.phone}
-                            onChange={(event) =>
-                                setData('phone', event.target.value)
-                            }
-                            className="w-full rounded-md border px-3 py-2"
-                        />
+                                <div className="flex flex-col gap-2">
+                                    <Label htmlFor="date_of_birth">Date of Birth (Optional)</Label>
+                                    <Input
+                                        id="date_of_birth"
+                                        type="date"
+                                        value={data.date_of_birth}
+                                        onChange={(event) =>
+                                            setData('date_of_birth', event.target.value)
+                                        }
+                                    />
+                                    <InputError message={errors.date_of_birth} />
+                                </div>
+                            </CardContent>
 
-                        {errors.phone && (
-                            <p className="mt-1 text-sm text-destructive">
-                                {errors.phone}
-                            </p>
-                        )}
-                    </div>
-
-                    <div>
-                        <label
-                            htmlFor="email"
-                            className="mb-2 block text-sm font-medium"
-                        >
-                            Email
-                        </label>
-
-                        <input
-                            id="email"
-                            type="email"
-                            value={data.email}
-                            onChange={(event) =>
-                                setData('email', event.target.value)
-                            }
-                            className="w-full rounded-md border px-3 py-2"
-                        />
-
-                        {errors.email && (
-                            <p className="mt-1 text-sm text-destructive">
-                                {errors.email}
-                            </p>
-                        )}
-                    </div>
-
-                    <div>
-                        <label
-                            htmlFor="date_of_birth"
-                            className="mb-2 block text-sm font-medium"
-                        >
-                            Date of birth
-                        </label>
-
-                        <input
-                            id="date_of_birth"
-                            type="date"
-                            value={data.date_of_birth}
-                            onChange={(event) =>
-                                setData(
-                                    'date_of_birth',
-                                    event.target.value,
-                                )
-                            }
-                            className="w-full rounded-md border px-3 py-2"
-                        />
-
-                        {errors.date_of_birth && (
-                            <p className="mt-1 text-sm text-destructive">
-                                {errors.date_of_birth}
-                            </p>
-                        )}
-                    </div>
-
-                    <div className="flex items-center justify-end gap-3">
-                        <Link
-                            href="/members"
-                            className="rounded-md border px-4 py-2 text-sm font-medium"
-                        >
-                            Cancel
-                        </Link>
-
-                        <button
-                            type="submit"
-                            disabled={processing}
-                            className="rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground disabled:opacity-50"
-                        >
-                            {processing ? 'Creating...' : 'Create Member'}
-                        </button>
-                    </div>
-                </form>
+                            <CardFooter className="flex justify-end gap-3 border-t bg-muted/10 px-6 py-4">
+                                <Button variant="outline" asChild>
+                                    <Link href={members.index()}>Cancel</Link>
+                                </Button>
+                                <Button type="submit" disabled={processing}>
+                                    {processing ? (
+                                        <Spinner data-icon="inline-start" />
+                                    ) : (
+                                        <UserPlus data-icon="inline-start" className="size-4" />
+                                    )}
+                                    Create Member
+                                </Button>
+                            </CardFooter>
+                        </form>
+                    </Card>
+                </div>
             </div>
         </>
     );

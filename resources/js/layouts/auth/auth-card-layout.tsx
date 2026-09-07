@@ -24,11 +24,17 @@ export default function AuthCardLayout({
             <div className="flex w-full max-w-md flex-col gap-6">
                 <Link
                     href={home()}
-                    className="flex items-center gap-2 self-center font-medium"
+                    className="group flex flex-col items-center gap-2 self-center font-medium"
                 >
-                    <div className="flex h-9 w-9 items-center justify-center">
-                        <AppLogoIcon className="size-9 fill-current text-black dark:text-white" />
+                    <div className="relative flex items-center justify-center">
+                        <div className="absolute -inset-2 rounded-full bg-emerald-500/20 blur-lg dark:bg-emerald-500/10" />
+                        <img
+                            src="/images/gympilot-logo.png"
+                            alt="GymPilot"
+                            className="relative size-14 rounded-2xl object-contain border border-border/80 bg-white dark:bg-card p-1 shadow-xs transition-transform duration-200 group-hover:scale-105"
+                        />
                     </div>
+                    <span className="text-base font-bold tracking-tight text-foreground">GymPilot</span>
                 </Link>
 
                 <div className="flex flex-col gap-6">

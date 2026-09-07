@@ -3,11 +3,32 @@ import {
     AlertCircle,
     CheckCircle2,
     Clock3,
+    DollarSign,
     Search,
+    User,
     UserPlus,
     X,
+    ChevronRight,
 } from 'lucide-react';
 import { useEffect, useState } from 'react';
+import { Badge } from '@/components/ui/badge';
+import { Button } from '@/components/ui/button';
+import {
+    Card,
+    CardContent,
+    CardDescription,
+    CardHeader,
+    CardTitle,
+} from '@/components/ui/card';
+import { Input } from '@/components/ui/input';
+import {
+    Table,
+    TableBody,
+    TableCell,
+    TableHead,
+    TableHeader,
+    TableRow,
+} from '@/components/ui/table';
 
 type MembershipStatus =
     | 'active'
@@ -55,12 +76,12 @@ const membershipFilters: {
     value: MembershipStatus | '';
     label: string;
 }[] = [
-        { value: '', label: 'All' },
-        { value: 'active', label: 'Active' },
-        { value: 'expiring', label: 'Expiring' },
-        { value: 'expired', label: 'Expired' },
-        { value: 'none', label: 'No Membership' },
-    ];
+    { value: '', label: 'All' },
+    { value: 'active', label: 'Active' },
+    { value: 'expiring', label: 'Expiring' },
+    { value: 'expired', label: 'Expired' },
+    { value: 'none', label: 'No Membership' },
+];
 
 function formatCurrency(amount: number): string {
     const safeAmount = Number.isFinite(Number(amount))
@@ -94,7 +115,6 @@ function normalizeBalanceDue(
     amount: number | string | null | undefined,
 ): number {
     const value = Number(amount);
-
     return Number.isFinite(value) ? value : 0;
 }
 
@@ -116,51 +136,35 @@ function MembershipBadge({
 }: {
     status: MembershipStatus;
 }) {
-    const config = {
-        active: {
-            label: 'Active',
-            className:
-                'bg-emerald-50 text-emerald-700 ring-emerald-600/20 dark:bg-emerald-950/40 dark:text-emerald-300',
-            icon: CheckCircle2,
-        },
-        expiring: {
-            label: 'Expiring',
-            className:
-                'bg-amber-50 text-amber-700 ring-amber-600/20 dark:bg-amber-950/40 dark:text-amber-300',
-            icon: Clock3,
-        },
-        expired: {
-            label: 'Expired',
-            className:
-                'bg-red-50 text-red-700 ring-red-600/20 dark:bg-red-950/40 dark:text-red-300',
-            icon: AlertCircle,
-        },
-        none: {
-            label: 'No Membership',
-            className:
-                'bg-muted text-muted-foreground ring-border',
-            icon: AlertCircle,
-        },
-    }[status] ?? {
-        label: 'No Membership',
-        className:
-            'bg-muted text-muted-foreground ring-border',
-        icon: AlertCircle,
-    };
-
-    const Icon = config.icon;
-
-    return (
-        <span
-            className={[
-                'inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-xs font-medium ring-1 ring-inset',
-                config.className,
-            ].join(' ')}
-        >
-            <Icon className="h-3.5 w-3.5" />
-            {config.label}
-        </span>
-    );
+    switch (status) {
+        case 'active':
+            return (
+                <Badge variant="outline" className="gap-1 border-emerald-500/30 bg-emerald-500/10 text-emerald-600 dark:text-emerald-400">
+                    <CheckCircle2 className="size-3" />
+                    Active
+                </Badge>
+            );
+        case 'expiring':
+            return (
+                <Badge variant="outline" className="gap-1 border-amber-500/30 bg-amber-500/10 text-amber-600 dark:text-amber-400">
+                    <Clock3 className="size-3" />
+                    Expiring
+                </Badge>
+            );
+        case 'expired':
+            return (
+                <Badge variant="destructive" className="gap-1">
+                    <AlertCircle className="size-3" />
+                    Expired
+                </Badge>
+            );
+        default:
+            return (
+                <Badge variant="secondary" className="gap-1 text-muted-foreground">
+                    No Membership
+                </Badge>
+            );
+    }
 }
 
 function FinancialBadge({
@@ -170,38 +174,40 @@ function FinancialBadge({
     status: FinancialStatus;
     balanceDue: number;
 }) {
-    if (status === 'paid') {
+    if (status === 'paid' && balanceDue <= 0) {
         return (
-            <span className="text-sm text-muted-foreground">
-                Paid
-            </span>
+            <Badge variant="outline" className="gap-1 border-emerald-500/30 bg-emerald-500/10 text-emerald-600 dark:text-emerald-400">
+                <CheckCircle2 className="size-3" />
+                Fully Paid
+            </Badge>
         );
     }
 
     return (
-        <div className="flex items-center gap-1.5 text-sm font-medium text-orange-700 dark:text-orange-300">
-            <span>{formatCurrency(balanceDue)} due</span>
-        </div>
+        <Badge variant="outline" className="gap-1 border-amber-500/30 bg-amber-500/10 text-amber-600 dark:text-amber-400 font-semibold">
+            <DollarSign className="size-3" />
+            Due {formatCurrency(balanceDue)}
+        </Badge>
     );
 }
 
 export default function Index({
     members,
-    search,
-    membership_status,
-    financial_status,
+    search = '',
+    membership_status = '',
+    financial_status = '',
 }: MembersIndexProps) {
     const [query, setQuery] = useState(search);
 
-    const normalizedMembershipStatus = membership_status &&
-        ['active', 'expiring', 'expired', 'none'].includes(membership_status)
-        ? membership_status as MembershipStatus
-        : '';
+    const normalizedMembershipStatus: MembershipStatus | '' =
+        membership_status && ['active', 'expiring', 'expired', 'none'].includes(membership_status)
+            ? (membership_status as MembershipStatus)
+            : '';
 
-    const normalizedFinancialStatus = financial_status &&
-        ['paid', 'outstanding'].includes(financial_status)
-        ? financial_status as FinancialStatus
-        : '';
+    const normalizedFinancialStatus: FinancialStatus | '' =
+        financial_status && ['paid', 'outstanding'].includes(financial_status)
+            ? (financial_status as FinancialStatus)
+            : '';
 
     useEffect(() => {
         setQuery(search);
@@ -216,9 +222,7 @@ export default function Index({
             router.get(
                 '/members',
                 {
-                    ...(query.trim()
-                        ? { search: query.trim() }
-                        : {}),
+                    ...(query.trim() ? { search: query.trim() } : {}),
                     ...(normalizedMembershipStatus
                         ? { membership_status: normalizedMembershipStatus }
                         : {}),
@@ -249,20 +253,12 @@ export default function Index({
         router.get(
             '/members',
             {
-                ...(query.trim()
-                    ? { search: query.trim() }
-                    : {}),
+                ...(query.trim() ? { search: query.trim() } : {}),
                 ...(nextMembershipStatus
-                    ? {
-                        membership_status:
-                            nextMembershipStatus,
-                    }
+                    ? { membership_status: nextMembershipStatus }
                     : {}),
                 ...(nextFinancialStatus
-                    ? {
-                        financial_status:
-                            nextFinancialStatus,
-                    }
+                    ? { financial_status: nextFinancialStatus }
                     : {}),
             },
             {
@@ -273,374 +269,314 @@ export default function Index({
         );
     }
 
-    const hasActiveFilters =
-        Boolean(membership_status || financial_status);
+    const hasActiveFilters = Boolean(membership_status || financial_status);
 
     return (
         <>
             <Head title="Members" />
 
-            <div className="flex h-full flex-1 flex-col gap-6 p-6">
-                <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
+            <div className="flex h-full flex-1 flex-col gap-6 p-4 sm:p-6 max-w-7xl mx-auto w-full">
+                {/* Header */}
+                <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
                     <div>
-                        <h1 className="text-2xl font-semibold tracking-tight">
-                            Members
-                        </h1>
-
-                        <p className="mt-1 text-sm text-muted-foreground">
-                            Manage your gym members and their profiles.
+                        <h1 className="text-2xl sm:text-3xl font-semibold tracking-tight text-foreground">Members</h1>
+                        <p className="mt-1 text-sm text-muted-foreground font-normal">
+                            Manage your member roster, monitor active subscriptions, and track dues.
                         </p>
                     </div>
 
-                    <Link
-                        href="/members/create"
-                        className="inline-flex items-center justify-center gap-2 rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground transition hover:opacity-90"
-                    >
-                        <UserPlus className="h-4 w-4" />
-                        Add Member
-                    </Link>
+                    <Button asChild className="gap-2 shrink-0 rounded-full px-5 text-xs font-medium shadow-xs">
+                        <Link href="/members/create">
+                            <UserPlus className="size-4" />
+                            <span>Add Member</span>
+                        </Link>
+                    </Button>
                 </div>
 
-                <div className="space-y-4">
-                    <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-                        <div className="relative w-full sm:max-w-md">
-                            <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+                {/* Filters and search card */}
+                <Card className="border-border/80">
+                    <CardContent className="flex flex-col gap-4 p-4 sm:p-5">
+                        <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                            <div className="relative w-full sm:max-w-md">
+                                <Search className="pointer-events-none absolute left-3.5 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
+                                <Input
+                                    type="search"
+                                    value={query}
+                                    onChange={(event) => setQuery(event.target.value)}
+                                    placeholder="Search by name, phone, or email..."
+                                    className="pl-9.5 h-10 rounded-full bg-black/[0.03] dark:bg-white/[0.05] border-border/80 text-sm"
+                                />
+                            </div>
 
-                            <input
-                                type="search"
-                                value={query}
-                                onChange={(event) =>
-                                    setQuery(
-                                        event.target.value,
-                                    )
-                                }
-                                placeholder="Search by name, phone, or email..."
-                                className="h-10 w-full rounded-md border bg-background pl-9 pr-3 text-sm outline-none transition focus:ring-2 focus:ring-ring"
-                            />
+                            <Badge variant="outline" className="w-fit text-xs px-3.5 py-1 font-medium bg-card/80">
+                                <span className="tabular-nums font-semibold mr-1">{members.total}</span> {members.total === 1 ? 'member' : 'members'}
+                            </Badge>
                         </div>
 
-                        <p className="text-sm text-muted-foreground">
-                            {members.total}{' '}
-                            {members.total === 1
-                                ? 'member'
-                                : 'members'}
-                        </p>
-                    </div>
-
-                    <div className="space-y-3">
+                        {/* Filter chips */}
                         <div className="flex flex-wrap items-center gap-2">
                             {membershipFilters.map((filter) => {
-                                const isActive =
-                                    membership_status ===
-                                    filter.value;
-
+                                const isActive = normalizedMembershipStatus === filter.value;
                                 return (
-                                    <button
+                                    <Button
                                         key={filter.value || 'all'}
                                         type="button"
+                                        size="sm"
+                                        variant={isActive ? 'default' : 'outline'}
                                         onClick={() =>
                                             applyFilters(
                                                 filter.value,
-                                                financial_status,
+                                                normalizedFinancialStatus,
                                             )
                                         }
-                                        className={[
-                                            'rounded-full border px-3 py-1.5 text-sm transition',
-                                            isActive
-                                                ? 'border-foreground bg-foreground text-background'
-                                                : 'hover:bg-muted',
-                                        ].join(' ')}
+                                        className={`h-8 rounded-full text-xs font-medium transition-all ${
+                                            isActive ? 'shadow-xs' : 'bg-card/80 hover:bg-secondary border-border/80'
+                                        }`}
                                     >
                                         {filter.label}
-                                    </button>
+                                    </Button>
                                 );
                             })}
 
-                            <span className="mx-1 hidden h-5 w-px bg-border sm:block" />
+                            <span className="hidden h-5 w-px bg-border/80 sm:block" />
 
-                            <button
+                            <Button
                                 type="button"
+                                size="sm"
+                                variant={normalizedFinancialStatus === 'outstanding' ? 'default' : 'outline'}
                                 onClick={() =>
                                     applyFilters(
-                                        membership_status,
-                                        financial_status ===
-                                            'outstanding'
+                                        normalizedMembershipStatus,
+                                        normalizedFinancialStatus === 'outstanding'
                                             ? ''
                                             : 'outstanding',
                                     )
                                 }
-                                className={[
-                                    'rounded-full border px-3 py-1.5 text-sm transition',
-                                    financial_status ===
-                                        'outstanding'
-                                        ? 'border-foreground bg-foreground text-background'
-                                        : 'hover:bg-muted',
-                                ].join(' ')}
+                                className={`h-8 rounded-full text-xs font-medium transition-all ${
+                                    normalizedFinancialStatus === 'outstanding' ? 'shadow-xs' : 'bg-card/80 hover:bg-secondary border-border/80'
+                                }`}
                             >
-                                Outstanding
-                            </button>
+                                Outstanding Dues
+                            </Button>
 
                             {hasActiveFilters && (
-                                <button
+                                <Button
                                     type="button"
-                                    onClick={() =>
-                                        applyFilters('', '')
-                                    }
-                                    className="inline-flex items-center gap-1.5 rounded-full px-3 py-1.5 text-sm text-muted-foreground hover:bg-muted hover:text-foreground"
+                                    size="sm"
+                                    variant="ghost"
+                                    onClick={() => applyFilters('', '')}
+                                    className="h-8 rounded-full text-xs text-muted-foreground hover:text-foreground gap-1.5"
                                 >
-                                    <X className="h-3.5 w-3.5" />
-                                    Clear filters
-                                </button>
+                                    <X className="size-3.5" />
+                                    <span>Clear filters</span>
+                                </Button>
                             )}
                         </div>
+                    </CardContent>
+                </Card>
 
-                        {hasActiveFilters && (
-                            <p className="text-xs text-muted-foreground">
-                                Showing filtered members. Filters
-                                apply together with search.
-                            </p>
-                        )}
-                    </div>
-                </div>
+                {/* Members Table (Desktop) */}
+                <Card className="hidden md:block border-border overflow-hidden py-0 gap-0">
+                    <CardContent className="p-0">
+                        {members.data.length === 0 ? (
+                            <div className="flex flex-col items-center justify-center p-12 text-center">
+                                <User className="size-10 text-muted-foreground/40" />
+                                <p className="mt-3 text-sm font-semibold">
+                                    {query || hasActiveFilters
+                                        ? 'No members match these criteria'
+                                        : 'No members yet'}
+                                </p>
+                                <p className="mt-1 text-xs text-muted-foreground max-w-sm">
+                                    {query || hasActiveFilters
+                                        ? 'Try clearing active filters or searching a different term.'
+                                        : 'Add your first gym member to begin tracking attendance and subscriptions.'}
+                                </p>
+                                {!query && !hasActiveFilters && (
+                                    <Button asChild size="sm" className="mt-4 gap-1.5">
+                                        <Link href="/members/create">
+                                            <UserPlus className="size-4" />
+                                            Add Member
+                                        </Link>
+                                    </Button>
+                                )}
+                            </div>
+                        ) : (
+                            <Table>
+                                <TableHeader>
+                                    <TableRow className="bg-muted/30 hover:bg-muted/30">
+                                        <TableHead className="pl-4 sm:pl-6 min-w-[240px] w-[35%]">Member</TableHead>
+                                        <TableHead>Membership Status</TableHead>
+                                        <TableHead>Financial Status</TableHead>
+                                        <TableHead className="text-center pr-4 sm:pr-6">Action</TableHead>
+                                    </TableRow>
+                                </TableHeader>
+                                <TableBody>
+                                    {members.data.map((member) => (
+                                        <TableRow key={member.id} className="hover:bg-muted/30 transition-colors">
+                                            <TableCell className="pl-4 sm:pl-6">
+                                                <div className="flex items-center gap-3">
+                                                    <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-primary/10 text-primary font-bold text-xs">
+                                                        {member.name.charAt(0).toUpperCase()}
+                                                    </div>
+                                                    <div className="min-w-0">
+                                                        <Link
+                                                            href={`/members/${member.id}`}
+                                                            className="font-bold text-foreground hover:underline block truncate"
+                                                        >
+                                                            {member.name}
+                                                        </Link>
+                                                        <p className="text-xs text-muted-foreground truncate">
+                                                            {member.phone} {member.email ? `· ${member.email}` : ''}
+                                                        </p>
+                                                    </div>
+                                                </div>
+                                            </TableCell>
 
-                <div className="hidden overflow-hidden rounded-lg border md:block">
-                    <table className="w-full text-sm">
-                        <thead className="border-b bg-muted/40">
-                            <tr>
-                                <th className="px-5 py-3 text-left font-medium">
-                                    Member
-                                </th>
+                                            <TableCell>
+                                                <div className="flex flex-col gap-1 items-start">
+                                                    <MembershipBadge
+                                                        status={normalizeMembershipStatus(
+                                                            member.membership_status,
+                                                        )}
+                                                    />
+                                                    {member.membership_expires_at && (
+                                                        <span className="text-[11px] text-muted-foreground">
+                                                            {normalizeMembershipStatus(
+                                                                member.membership_status,
+                                                            ) === 'expired'
+                                                                ? `Expired ${formatDate(member.membership_expires_at)}`
+                                                                : `Ends ${formatDate(member.membership_expires_at)}`}
+                                                        </span>
+                                                    )}
+                                                </div>
+                                            </TableCell>
 
-                                <th className="px-5 py-3 text-left font-medium">
-                                    Membership
-                                </th>
+                                            <TableCell>
+                                                <FinancialBadge
+                                                    status={normalizeFinancialStatus(
+                                                        member.financial_status,
+                                                    )}
+                                                    balanceDue={normalizeBalanceDue(
+                                                        member.balance_due,
+                                                    )}
+                                                />
+                                            </TableCell>
 
-                                <th className="px-5 py-3 text-left font-medium">
-                                    Financial
-                                </th>
-
-                                <th className="px-5 py-3 text-right font-medium">
-                                    Action
-                                </th>
-                            </tr>
-                        </thead>
-
-                        <tbody>
-                            {members.data.length === 0 ? (
-                                <tr>
-                                    <td
-                                        colSpan={4}
-                                        className="px-5 py-12 text-center"
-                                    >
-                                        <div className="mx-auto max-w-sm">
-                                            <p className="font-medium">
-                                                {query ||
-                                                    hasActiveFilters
-                                                    ? 'No members match these criteria'
-                                                    : 'No members yet'}
-                                            </p>
-
-                                            <p className="mt-1 text-sm text-muted-foreground">
-                                                {query ||
-                                                    hasActiveFilters
-                                                    ? 'Try a different search or clear a filter.'
-                                                    : 'Add your first member to get started.'}
-                                            </p>
-
-                                            {!query &&
-                                                !hasActiveFilters && (
-                                                    <Link
-                                                        href="/members/create"
-                                                        className="mt-4 inline-flex rounded-md border px-4 py-2 text-sm font-medium hover:bg-muted"
-                                                    >
-                                                        Add Member
+                                            <TableCell className="text-center pr-4 sm:pr-6">
+                                                <Button variant="ghost" size="sm" asChild className="gap-1 font-semibold hover:bg-muted">
+                                                    <Link href={`/members/${member.id}`}>
+                                                        <span>View Profile</span>
+                                                        <ChevronRight className="size-4" />
                                                     </Link>
-                                                )}
+                                                </Button>
+                                            </TableCell>
+                                        </TableRow>
+                                    ))}
+                                </TableBody>
+                            </Table>
+                        )}
+                    </CardContent>
+                </Card>
+
+                {/* Mobile Cards view */}
+                <div className="flex flex-col gap-3 md:hidden">
+                    {members.data.length === 0 ? (
+                        <Card className="flex flex-col items-center justify-center p-8 text-center border-border">
+                            <User className="size-8 text-muted-foreground/40" />
+                            <p className="mt-3 text-sm font-semibold">No members found</p>
+                            <p className="mt-1 text-xs text-muted-foreground">
+                                Adjust your search or filters.
+                            </p>
+                        </Card>
+                    ) : (
+                        members.data.map((member) => (
+                            <Card key={member.id} className="border-border">
+                                <CardHeader className="pb-2">
+                                    <div className="flex items-center gap-3">
+                                        <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-primary/10 text-primary font-bold text-xs">
+                                            {member.name.charAt(0).toUpperCase()}
                                         </div>
-                                    </td>
-                                </tr>
-                            ) : (
-                                members.data.map((member) => (
-                                    <tr
-                                        key={member.id}
-                                        className="border-b last:border-0 hover:bg-muted/20"
-                                    >
-                                        <td className="px-5 py-4">
+                                        <div className="min-w-0 flex-1">
                                             <Link
                                                 href={`/members/${member.id}`}
-                                                className="font-medium hover:underline"
+                                                className="font-bold text-foreground hover:underline block truncate"
                                             >
                                                 {member.name}
                                             </Link>
-
-                                            <p className="mt-1 text-xs text-muted-foreground">
+                                            <p className="text-xs text-muted-foreground truncate">
                                                 {member.phone}
                                             </p>
-                                        </td>
-
-                                        <td className="px-5 py-4">
-                                            <MembershipBadge
-                                                status={
-                                                    normalizeMembershipStatus(member.membership_status)
-                                                }
-                                            />
-
-                                            {member.membership_expires_at && (
-                                                <p className="mt-1 text-xs text-muted-foreground">
-                                                    {normalizeMembershipStatus(member.membership_status) ===
-                                                        'expired'
-                                                        ? `Expired ${formatDate(member.membership_expires_at)}`
-                                                        : `Ends ${formatDate(member.membership_expires_at)}`}
-                                                </p>
-                                            )}
-                                        </td>
-
-                                        <td className="px-5 py-4">
-                                            <FinancialBadge
-                                                status={
-                                                    normalizeFinancialStatus(member.financial_status)
-                                                }
-                                                balanceDue={
-                                                    normalizeBalanceDue(
-                                                        member.balance_due,
-                                                    )
-                                                }
-                                            />
-                                        </td>
-
-                                        <td className="px-5 py-4 text-right">
-                                            <Link
-                                                href={`/members/${member.id}`}
-                                                className="font-medium hover:underline"
-                                            >
+                                        </div>
+                                        <Button variant="outline" size="sm" asChild className="shrink-0">
+                                            <Link href={`/members/${member.id}`}>
                                                 View
                                             </Link>
-                                        </td>
-                                    </tr>
-                                ))
-                            )}
-                        </tbody>
-                    </table>
-                </div>
-
-                <div className="space-y-3 md:hidden">
-                    {members.data.length === 0 ? (
-                        <div className="rounded-lg border border-dashed px-5 py-12 text-center">
-                            <p className="font-medium">
-                                {query || hasActiveFilters
-                                    ? 'No members match these criteria'
-                                    : 'No members yet'}
-                            </p>
-
-                            <p className="mt-1 text-sm text-muted-foreground">
-                                {query || hasActiveFilters
-                                    ? 'Try a different search or clear a filter.'
-                                    : 'Add your first member to get started.'}
-                            </p>
-
-                            {!query &&
-                                !hasActiveFilters && (
-                                    <Link
-                                        href="/members/create"
-                                        className="mt-4 inline-flex rounded-md border px-4 py-2 text-sm font-medium hover:bg-muted"
-                                    >
-                                        Add Member
-                                    </Link>
-                                )}
-                        </div>
-                    ) : (
-                        members.data.map((member) => (
-                            <div
-                                key={member.id}
-                                className="rounded-lg border p-4"
-                            >
-                                <div className="flex items-start justify-between gap-4">
-                                    <div className="min-w-0">
-                                        <Link
-                                            href={`/members/${member.id}`}
-                                            className="font-medium hover:underline"
-                                        >
-                                            {member.name}
-                                        </Link>
-
-                                        <p className="mt-1 text-sm text-muted-foreground">
-                                            {member.phone}
-                                        </p>
-
-                                        {member.email && (
-                                            <p className="mt-1 truncate text-sm text-muted-foreground">
-                                                {member.email}
-                                            </p>
-                                        )}
+                                        </Button>
                                     </div>
-
-                                    <Link
-                                        href={`/members/${member.id}`}
-                                        className="shrink-0 rounded-md border px-3 py-1.5 text-xs font-medium hover:bg-muted"
-                                    >
-                                        View
-                                    </Link>
-                                </div>
-
-                                <div className="mt-4 flex flex-wrap items-center gap-2">
-                                    <MembershipBadge
-                                        status={
-                                            normalizeMembershipStatus(member.membership_status)
-                                        }
-                                    />
-
+                                </CardHeader>
+                                <CardContent className="flex flex-col gap-2 pt-2">
+                                    <div className="flex flex-wrap items-center gap-2">
+                                        <MembershipBadge
+                                            status={normalizeMembershipStatus(
+                                                member.membership_status,
+                                            )}
+                                        />
+                                        <FinancialBadge
+                                            status={normalizeFinancialStatus(
+                                                member.financial_status,
+                                            )}
+                                            balanceDue={normalizeBalanceDue(
+                                                member.balance_due,
+                                            )}
+                                        />
+                                    </div>
                                     {member.membership_expires_at && (
-                                        <span className="text-xs text-muted-foreground">
-                                            {normalizeMembershipStatus(member.membership_status) ===
-                                                'expired'
+                                        <span className="text-[11px] text-muted-foreground">
+                                            {normalizeMembershipStatus(
+                                                member.membership_status,
+                                            ) === 'expired'
                                                 ? `Expired ${formatDate(member.membership_expires_at)}`
                                                 : `Ends ${formatDate(member.membership_expires_at)}`}
                                         </span>
                                     )}
-                                </div>
-
-                                <div className="mt-3 border-t pt-3">
-                                    <FinancialBadge
-                                        status={
-                                            normalizeFinancialStatus(member.financial_status)
-                                        }
-                                        balanceDue={
-                                            normalizeBalanceDue(
-                                                member.balance_due,
-                                            )
-                                        }
-                                    />
-                                </div>
-                            </div>
+                                </CardContent>
+                            </Card>
                         ))
                     )}
                 </div>
 
+                {/* Pagination */}
                 {members.last_page > 1 && (
-                    <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-                        <p className="text-sm text-muted-foreground">
-                            Page {members.current_page} of{' '}
-                            {members.last_page}
+                    <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between pt-2">
+                        <p className="text-xs text-muted-foreground font-medium">
+                            Showing page {members.current_page} of {members.last_page} ({members.total} members total)
                         </p>
 
-                        <div className="flex flex-wrap gap-2">
+                        <div className="flex flex-wrap items-center gap-1.5">
                             {members.links.map((link, index) => (
-                                <Link
+                                <Button
                                     key={`${link.label}-${index}`}
-                                    href={link.url ?? '#'}
-                                    className={[
-                                        'rounded-md border px-3 py-1.5 text-sm transition',
-                                        link.active
-                                            ? 'bg-muted font-medium'
-                                            : 'hover:bg-muted',
-                                        !link.url
-                                            ? 'pointer-events-none opacity-40'
-                                            : '',
-                                    ].join(' ')}
-                                    dangerouslySetInnerHTML={{
-                                        __html: link.label,
-                                    }}
-                                />
+                                    variant={link.active ? 'default' : 'outline'}
+                                    size="sm"
+                                    disabled={!link.url}
+                                    asChild={Boolean(link.url)}
+                                    className="h-8 min-w-8 text-xs"
+                                >
+                                    {link.url ? (
+                                        <Link
+                                            href={link.url}
+                                            dangerouslySetInnerHTML={{
+                                                __html: link.label,
+                                            }}
+                                        />
+                                    ) : (
+                                        <span
+                                            dangerouslySetInnerHTML={{
+                                                __html: link.label,
+                                            }}
+                                        />
+                                    )}
+                                </Button>
                             ))}
                         </div>
                     </div>

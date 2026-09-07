@@ -93,7 +93,14 @@ export function AppHeader({ breadcrumbs = [] }: Props) {
                                     Navigation menu
                                 </SheetTitle>
                                 <SheetHeader className="flex justify-start text-left">
-                                    <AppLogoIcon className="h-6 w-6 fill-current text-black dark:text-white" />
+                                    <div className="flex items-center gap-2">
+                                        <img
+                                            src="/images/gympilot-logo.png"
+                                            alt="GymPilot"
+                                            className="size-7 rounded-lg object-contain border border-border/70 bg-white dark:bg-card p-0.5"
+                                        />
+                                        <span className="font-bold text-sm text-foreground">GymPilot</span>
+                                    </div>
                                 </SheetHeader>
                                 <div className="flex h-full flex-1 flex-col space-y-4 p-4">
                                     <div className="flex h-full flex-col justify-between text-sm">

@@ -1,4 +1,27 @@
 import { Head, Link, useForm } from '@inertiajs/react';
+import { ArrowLeft, Calendar, CreditCard, DollarSign, ShieldCheck } from 'lucide-react';
+import * as React from 'react';
+import InputError from '@/components/input-error';
+import { Badge } from '@/components/ui/badge';
+import { Button } from '@/components/ui/button';
+import {
+    Card,
+    CardContent,
+    CardDescription,
+    CardHeader,
+    CardTitle,
+} from '@/components/ui/card';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import {
+    Select,
+    SelectContent,
+    SelectGroup,
+    SelectItem,
+    SelectTrigger,
+    SelectValue,
+} from '@/components/ui/select';
+import { Spinner } from '@/components/ui/spinner';
 import { dashboard } from '@/routes';
 import members from '@/routes/members';
 
@@ -61,24 +84,17 @@ export default function CreateMembership({
             )
             : null;
 
-    const planPrice = selectedPlan
-        ? Number(selectedPlan.price)
-        : 0;
-
+    const planPrice = selectedPlan ? Number(selectedPlan.price) : 0;
     const paymentAmount = Number(form.data.payment_amount) || 0;
 
     const paymentExceedsPrice =
-        form.data.payment &&
-        paymentAmount > planPrice;
+        form.data.payment && paymentAmount > planPrice;
 
     const paymentIsInvalid =
         form.data.payment &&
         (paymentAmount <= 0 || paymentExceedsPrice);
 
-    const remainingBalance = Math.max(
-        planPrice - paymentAmount,
-        0,
-    );
+    const remainingBalance = Math.max(planPrice - paymentAmount, 0);
 
     const formatDate = (date: Date | null) => {
         if (!date) {
@@ -99,9 +115,7 @@ export default function CreateMembership({
             return;
         }
 
-        form.post(
-            members.memberships.store(member.id).url,
-        );
+        form.post(members.memberships.store(member.id).url);
     };
 
     return (
@@ -109,491 +123,277 @@ export default function CreateMembership({
             <Head title={`Add Membership — ${member.name}`} />
 
             <div className="flex h-full flex-1 flex-col gap-6 p-6">
-                {/* Header */}
                 <div>
-                    <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                        <Link
-                            href={members.show(member.id)}
-                            className="hover:underline"
-                        >
-                            {member.name}
+                    <Button variant="ghost" size="sm" asChild className="-ml-3 mb-2 text-muted-foreground">
+                        <Link href={members.show(member.id)}>
+                            <ArrowLeft data-icon="inline-start" className="size-4" />
+                            Back to {member.name}
                         </Link>
+                    </Button>
 
-                        <span>/</span>
-
-                        <span>New Membership</span>
-                    </div>
-
-                    <h1 className="mt-2 text-2xl font-semibold tracking-tight">
-                        Add Membership
-                    </h1>
-
+                    <h1 className="text-2xl font-bold tracking-tight">Add Membership</h1>
                     <p className="mt-1 text-sm text-muted-foreground">
-                        Create a new membership for {member.name}.
+                        Assign an active membership plan to {member.name}.
                     </p>
                 </div>
 
                 {plans.length === 0 ? (
-                    <section className="rounded-xl border">
-                        <div className="px-6 py-10 text-center">
-                            <h2 className="font-semibold">
-                                No active membership plans
-                            </h2>
-
-                            <p className="mt-2 text-sm text-muted-foreground">
-                                Create and activate a membership plan before
-                                adding a membership.
-                            </p>
-                        </div>
-                    </section>
+                    <Card className="flex flex-col items-center justify-center p-10 text-center">
+                        <CreditCard className="size-10 text-muted-foreground/40" />
+                        <h2 className="mt-4 font-semibold">No active membership plans</h2>
+                        <p className="mt-1 text-sm text-muted-foreground">
+                            Create and activate at least one membership plan before assigning subscriptions.
+                        </p>
+                    </Card>
                 ) : (
-                    <form
-                        onSubmit={submit}
-                        className="max-w-2xl space-y-6"
-                    >
-                        {/* Membership details */}
-                        <section className="rounded-xl border">
-                            <div className="border-b px-6 py-4">
-                                <h2 className="font-semibold">
-                                    Membership Details
-                                </h2>
-
-                                <p className="mt-1 text-sm text-muted-foreground">
-                                    Select the plan and start date.
-                                </p>
-                            </div>
-
-                            <div className="space-y-5 px-6 py-6">
-                                {/* Plan */}
-                                <div className="space-y-2">
-                                    <label
-                                        htmlFor="membership_plan_id"
-                                        className="text-sm font-medium"
-                                    >
-                                        Membership Plan
-                                    </label>
-
-                                    <select
-                                        id="membership_plan_id"
-                                        value={form.data.membership_plan_id}
-                                        onChange={(event) =>
-                                            form.setData(
-                                                'membership_plan_id',
-                                                event.target.value,
-                                            )
-                                        }
-                                        className="w-full rounded-md border bg-background px-3 py-2 text-sm"
-                                    >
-                                        <option value="">
-                                            Select a plan
-                                        </option>
-
-                                        {plans.map((plan) => (
-                                            <option
-                                                key={plan.id}
-                                                value={plan.id}
+                    <form onSubmit={submit} className="flex max-w-4xl flex-col gap-6">
+                        <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_340px]">
+                            <div className="flex flex-col gap-6">
+                                {/* Plan & Date Card */}
+                                <Card>
+                                    <CardHeader>
+                                        <CardTitle className="text-base font-semibold">Plan & Period</CardTitle>
+                                        <CardDescription>
+                                            Select membership tier and beginning date.
+                                        </CardDescription>
+                                    </CardHeader>
+                                    <CardContent className="flex flex-col gap-5">
+                                        <div className="flex flex-col gap-2">
+                                            <Label htmlFor="membership_plan_id">Membership Plan</Label>
+                                            <Select
+                                                value={form.data.membership_plan_id}
+                                                onValueChange={(value) => form.setData('membership_plan_id', value)}
                                             >
-                                                {plan.name} — ₹{plan.price} (
-                                                {plan.duration_days} days)
-                                            </option>
-                                        ))}
-                                    </select>
-
-                                    {form.errors.membership_plan_id && (
-                                        <p className="text-sm text-destructive">
-                                            {
-                                                form.errors
-                                                    .membership_plan_id
-                                            }
-                                        </p>
-                                    )}
-                                </div>
-
-                                {/* Start date */}
-                                <div className="space-y-2">
-                                    <label
-                                        htmlFor="start_date"
-                                        className="text-sm font-medium"
-                                    >
-                                        Start Date
-                                    </label>
-
-                                    <input
-                                        id="start_date"
-                                        type="date"
-                                        value={form.data.start_date}
-                                        onChange={(event) =>
-                                            form.setData(
-                                                'start_date',
-                                                event.target.value,
-                                            )
-                                        }
-                                        className="w-full rounded-md border bg-background px-3 py-2 text-sm"
-                                    />
-
-                                    {form.errors.start_date && (
-                                        <p className="text-sm text-destructive">
-                                            {form.errors.start_date}
-                                        </p>
-                                    )}
-                                </div>
-                            </div>
-                        </section>
-
-                        {/* Payment */}
-                        {selectedPlan && (
-                            <section className="rounded-xl border">
-                                <div className="border-b px-6 py-4">
-                                    <h2 className="font-semibold">
-                                        Payment
-                                    </h2>
-
-                                    <p className="mt-1 text-sm text-muted-foreground">
-                                        Record payment now or collect it
-                                        later.
-                                    </p>
-                                </div>
-
-                                <div className="space-y-5 px-6 py-6">
-                                    {/* Payment choice */}
-                                    <div className="space-y-3">
-                                        <p className="text-sm font-medium">
-                                            Payment Status
-                                        </p>
-
-                                        <label className="flex cursor-pointer items-start gap-3 rounded-lg border p-4">
-                                            <input
-                                                type="radio"
-                                                name="payment"
-                                                checked={
-                                                    !form.data.payment
-                                                }
-                                                onChange={() => {
-                                                    form.setData(
-                                                        'payment',
-                                                        false,
-                                                    );
-
-                                                    form.setData(
-                                                        'payment_amount',
-                                                        '',
-                                                    );
-
-                                                    form.setData(
-                                                        'payment_method',
-                                                        '',
-                                                    );
-                                                }}
-                                                className="mt-1"
-                                            />
-
-                                            <div>
-                                                <p className="text-sm font-medium">
-                                                    Pay Later
-                                                </p>
-
-                                                <p className="mt-1 text-sm text-muted-foreground">
-                                                    Create the membership
-                                                    without recording a
-                                                    payment.
-                                                </p>
-                                            </div>
-                                        </label>
-
-                                        <label className="flex cursor-pointer items-start gap-3 rounded-lg border p-4">
-                                            <input
-                                                type="radio"
-                                                name="payment"
-                                                checked={form.data.payment}
-                                                onChange={() =>
-                                                    form.setData(
-                                                        'payment',
-                                                        true,
-                                                    )
-                                                }
-                                                className="mt-1"
-                                            />
-
-                                            <div>
-                                                <p className="text-sm font-medium">
-                                                    Pay Now
-                                                </p>
-
-                                                <p className="mt-1 text-sm text-muted-foreground">
-                                                    Record a payment with the
-                                                    membership.
-                                                </p>
-                                            </div>
-                                        </label>
-                                    </div>
-
-                                    {/* Payment fields */}
-                                    {form.data.payment && (
-                                        <div className="space-y-5 rounded-lg bg-muted/40 p-4">
-                                            {/* Amount */}
-                                            <div className="space-y-2">
-                                                <div className="flex items-center justify-between">
-                                                    <label
-                                                        htmlFor="payment_amount"
-                                                        className="text-sm font-medium"
-                                                    >
-                                                        Amount
-                                                    </label>
-
-                                                    <span className="text-xs text-muted-foreground">
-                                                        Maximum ₹
-                                                        {selectedPlan.price}
-                                                    </span>
-                                                </div>
-
-                                                <input
-                                                    id="payment_amount"
-                                                    type="number"
-                                                    min="0.01"
-                                                    max={planPrice}
-                                                    step="0.01"
-                                                    value={
-                                                        form.data
-                                                            .payment_amount
-                                                    }
-                                                    onChange={(event) =>
-                                                        form.setData(
-                                                            'payment_amount',
-                                                            event.target.value,
-                                                        )
-                                                    }
-                                                    className="w-full rounded-md border bg-background px-3 py-2 text-sm"
-                                                    placeholder="Enter amount"
-                                                />
-
-                                                {form.errors
-                                                    .payment_amount && (
-                                                        <p className="text-sm text-destructive">
-                                                            {
-                                                                form.errors
-                                                                    .payment_amount
-                                                            }
-                                                        </p>
-                                                    )}
-
-                                                {paymentExceedsPrice && (
-                                                    <p className="text-sm text-destructive">
-                                                        Payment cannot exceed
-                                                        the membership price of
-                                                        ₹{selectedPlan.price}.
-                                                    </p>
-                                                )}
-                                            </div>
-
-                                            {/* Payment method */}
-                                            <div className="space-y-2">
-                                                <label
-                                                    htmlFor="payment_method"
-                                                    className="text-sm font-medium"
-                                                >
-                                                    Payment Method
-                                                </label>
-
-                                                <select
-                                                    id="payment_method"
-                                                    value={
-                                                        form.data
-                                                            .payment_method
-                                                    }
-                                                    onChange={(event) =>
-                                                        form.setData(
-                                                            'payment_method',
-                                                            event.target.value,
-                                                        )
-                                                    }
-                                                    className="w-full rounded-md border bg-background px-3 py-2 text-sm"
-                                                >
-                                                    <option value="">
-                                                        Select payment method
-                                                    </option>
-
-                                                    {payment_methods.map(
-                                                        (method) => (
-                                                            <option
-                                                                key={
-                                                                    method.value
-                                                                }
-                                                                value={
-                                                                    method.value
-                                                                }
-                                                            >
-                                                                {method.label}
-                                                            </option>
-                                                        ),
-                                                    )}
-                                                </select>
-
-                                                {form.errors
-                                                    .payment_method && (
-                                                        <p className="text-sm text-destructive">
-                                                            {
-                                                                form.errors
-                                                                    .payment_method
-                                                            }
-                                                        </p>
-                                                    )}
-                                            </div>
-
-                                            {/* Paid at */}
-                                            <div className="space-y-2">
-                                                <label
-                                                    htmlFor="paid_at"
-                                                    className="text-sm font-medium"
-                                                >
-                                                    Payment Date & Time
-                                                </label>
-
-                                                <input
-                                                    id="paid_at"
-                                                    type="datetime-local"
-                                                    value={form.data.paid_at}
-                                                    onChange={(event) =>
-                                                        form.setData(
-                                                            'paid_at',
-                                                            event.target.value,
-                                                        )
-                                                    }
-                                                    className="w-full rounded-md border bg-background px-3 py-2 text-sm"
-                                                />
-
-                                                {form.errors.paid_at && (
-                                                    <p className="text-sm text-destructive">
-                                                        {
-                                                            form.errors
-                                                                .paid_at
-                                                        }
-                                                    </p>
-                                                )}
-                                            </div>
+                                                <SelectTrigger id="membership_plan_id">
+                                                    <SelectValue placeholder="Select plan" />
+                                                </SelectTrigger>
+                                                <SelectContent>
+                                                    <SelectGroup>
+                                                        {plans.map((plan) => (
+                                                            <SelectItem key={plan.id} value={plan.id}>
+                                                                {plan.name} — ₹{plan.price} ({plan.duration_days} days)
+                                                            </SelectItem>
+                                                        ))}
+                                                    </SelectGroup>
+                                                </SelectContent>
+                                            </Select>
+                                            <InputError message={form.errors.membership_plan_id} />
                                         </div>
-                                    )}
-                                </div>
-                            </section>
-                        )}
 
-                        {/* Summary */}
-                        {selectedPlan && (
-                            <section className="rounded-xl border">
-                                <div className="border-b px-6 py-4">
-                                    <h2 className="font-semibold">
-                                        Membership Summary
-                                    </h2>
-                                </div>
+                                        <div className="flex flex-col gap-2">
+                                            <Label htmlFor="start_date">Start Date</Label>
+                                            <Input
+                                                id="start_date"
+                                                type="date"
+                                                value={form.data.start_date}
+                                                onChange={(event) =>
+                                                    form.setData('start_date', event.target.value)
+                                                }
+                                                required
+                                            />
+                                            <InputError message={form.errors.start_date} />
+                                        </div>
+                                    </CardContent>
+                                </Card>
 
-                                <div className="grid gap-4 px-6 py-6 sm:grid-cols-3">
-                                    <div>
-                                        <p className="text-sm text-muted-foreground">
-                                            Plan
-                                        </p>
+                                {/* Payment Card */}
+                                {selectedPlan && (
+                                    <Card>
+                                        <CardHeader>
+                                            <div className="flex items-center justify-between">
+                                                <CardTitle className="text-base font-semibold">Payment Option</CardTitle>
+                                                <Badge variant="outline">
+                                                    Total ₹{Number(selectedPlan.price).toLocaleString('en-IN')}
+                                                </Badge>
+                                            </div>
+                                            <CardDescription>
+                                                Record full or partial payment upfront, or defer collection.
+                                            </CardDescription>
+                                        </CardHeader>
 
-                                        <p className="mt-1 font-medium">
-                                            {selectedPlan.name}
-                                        </p>
-                                    </div>
+                                        <CardContent className="flex flex-col gap-5">
+                                            <div className="grid grid-cols-2 gap-3">
+                                                <button
+                                                    type="button"
+                                                    onClick={() => {
+                                                        form.setData('payment', false);
+                                                        form.setData('payment_amount', '');
+                                                        form.setData('payment_method', '');
+                                                    }}
+                                                    className={`flex flex-col items-start rounded-lg border p-4 text-left transition ${
+                                                        !form.data.payment
+                                                            ? 'border-primary bg-primary/5 ring-1 ring-primary'
+                                                            : 'hover:bg-muted/40'
+                                                    }`}
+                                                >
+                                                    <span className="font-semibold text-sm">Pay Later</span>
+                                                    <span className="mt-1 text-xs text-muted-foreground">
+                                                        Record membership now with ₹{Number(selectedPlan.price).toLocaleString('en-IN')} balance due.
+                                                    </span>
+                                                </button>
 
-                                    <div>
-                                        <p className="text-sm text-muted-foreground">
-                                            Start Date
-                                        </p>
-
-                                        <p className="mt-1 font-medium">
-                                            {formatDate(startDate)}
-                                        </p>
-                                    </div>
-
-                                    <div>
-                                        <p className="text-sm text-muted-foreground">
-                                            End Date
-                                        </p>
-
-                                        <p className="mt-1 font-medium">
-                                            {formatDate(endDate)}
-                                        </p>
-                                    </div>
-
-                                    <div>
-                                        <p className="text-sm text-muted-foreground">
-                                            Duration
-                                        </p>
-
-                                        <p className="mt-1 font-medium">
-                                            {selectedPlan.duration_days} days
-                                        </p>
-                                    </div>
-
-                                    <div>
-                                        <p className="text-sm text-muted-foreground">
-                                            Membership Price
-                                        </p>
-
-                                        <p className="mt-1 font-medium">
-                                            ₹{selectedPlan.price}
-                                        </p>
-                                    </div>
-
-                                    {form.data.payment && (
-                                        <>
-                                            <div>
-                                                <p className="text-sm text-muted-foreground">
-                                                    Paid Now
-                                                </p>
-
-                                                <p className="mt-1 font-medium">
-                                                    ₹
-                                                    {paymentAmount.toFixed(
-                                                        2,
-                                                    )}
-                                                </p>
+                                                <button
+                                                    type="button"
+                                                    onClick={() => {
+                                                        form.setData('payment', true);
+                                                        form.setData('payment_amount', String(selectedPlan.price));
+                                                    }}
+                                                    className={`flex flex-col items-start rounded-lg border p-4 text-left transition ${
+                                                        form.data.payment
+                                                            ? 'border-primary bg-primary/5 ring-1 ring-primary'
+                                                            : 'hover:bg-muted/40'
+                                                    }`}
+                                                >
+                                                    <span className="font-semibold text-sm">Pay Now</span>
+                                                    <span className="mt-1 text-xs text-muted-foreground">
+                                                        Record instant payment entry against this membership.
+                                                    </span>
+                                                </button>
                                             </div>
 
-                                            <div>
-                                                <p className="text-sm text-muted-foreground">
-                                                    Remaining Balance
-                                                </p>
+                                            {form.data.payment && (
+                                                <div className="flex flex-col gap-4 rounded-lg border bg-muted/20 p-4">
+                                                    <div className="flex flex-col gap-2">
+                                                        <div className="flex items-center justify-between">
+                                                            <Label htmlFor="payment_amount">Payment Amount (₹)</Label>
+                                                            <span className="text-xs text-muted-foreground">
+                                                                Max ₹{selectedPlan.price}
+                                                            </span>
+                                                        </div>
+                                                        <Input
+                                                            id="payment_amount"
+                                                            type="number"
+                                                            min="0.01"
+                                                            max={planPrice}
+                                                            step="0.01"
+                                                            value={form.data.payment_amount}
+                                                            onChange={(event) =>
+                                                                form.setData('payment_amount', event.target.value)
+                                                            }
+                                                            placeholder={`Max ₹${selectedPlan.price}`}
+                                                            required
+                                                        />
+                                                        <InputError message={form.errors.payment_amount} />
+                                                        {paymentExceedsPrice && (
+                                                            <p className="text-xs text-destructive">
+                                                                Amount cannot exceed plan price ₹{selectedPlan.price}.
+                                                            </p>
+                                                        )}
+                                                    </div>
 
-                                                <p className="mt-1 font-medium">
-                                                    ₹
-                                                    {remainingBalance.toFixed(
-                                                        2,
-                                                    )}
-                                                </p>
+                                                    <div className="flex flex-col gap-2">
+                                                        <Label htmlFor="payment_method">Payment Method</Label>
+                                                        <Select
+                                                            value={form.data.payment_method}
+                                                            onValueChange={(value) => form.setData('payment_method', value)}
+                                                        >
+                                                            <SelectTrigger id="payment_method">
+                                                                <SelectValue placeholder="Select method" />
+                                                            </SelectTrigger>
+                                                            <SelectContent>
+                                                                <SelectGroup>
+                                                                    {payment_methods.map((method) => (
+                                                                        <SelectItem key={method.value} value={method.value}>
+                                                                            {method.label}
+                                                                        </SelectItem>
+                                                                    ))}
+                                                                </SelectGroup>
+                                                            </SelectContent>
+                                                        </Select>
+                                                        <InputError message={form.errors.payment_method} />
+                                                    </div>
+
+                                                    <div className="flex flex-col gap-2">
+                                                        <Label htmlFor="paid_at">Payment Date & Time</Label>
+                                                        <Input
+                                                            id="paid_at"
+                                                            type="datetime-local"
+                                                            value={form.data.paid_at}
+                                                            onChange={(event) =>
+                                                                form.setData('paid_at', event.target.value)
+                                                            }
+                                                            required
+                                                        />
+                                                        <InputError message={form.errors.paid_at} />
+                                                    </div>
+                                                </div>
+                                            )}
+                                        </CardContent>
+                                    </Card>
+                                )}
+                            </div>
+
+                            {/* Summary Sidebar */}
+                            {selectedPlan && (
+                                <div>
+                                    <Card className="sticky top-6">
+                                        <CardHeader className="pb-3">
+                                            <CardTitle className="text-base font-semibold">Summary</CardTitle>
+                                        </CardHeader>
+                                        <CardContent className="flex flex-col gap-3 text-sm">
+                                            <div className="flex justify-between">
+                                                <span className="text-muted-foreground">Plan</span>
+                                                <span className="font-medium">{selectedPlan.name}</span>
                                             </div>
-                                        </>
-                                    )}
+                                            <div className="flex justify-between">
+                                                <span className="text-muted-foreground">Duration</span>
+                                                <span className="font-medium">{selectedPlan.duration_days} days</span>
+                                            </div>
+                                            <div className="flex justify-between">
+                                                <span className="text-muted-foreground">Start</span>
+                                                <span className="font-medium">{formatDate(startDate)}</span>
+                                            </div>
+                                            <div className="flex justify-between">
+                                                <span className="text-muted-foreground">End</span>
+                                                <span className="font-medium">{formatDate(endDate)}</span>
+                                            </div>
+
+                                            <div className="my-1 border-t" />
+
+                                            <div className="flex justify-between text-base font-semibold">
+                                                <span>Plan Price</span>
+                                                <span>₹{Number(selectedPlan.price).toLocaleString('en-IN')}</span>
+                                            </div>
+
+                                            {form.data.payment && (
+                                                <>
+                                                    <div className="flex justify-between text-emerald-600 dark:text-emerald-400">
+                                                        <span>Paying Now</span>
+                                                        <span>- ₹{paymentAmount.toFixed(2)}</span>
+                                                    </div>
+                                                    <div className="flex justify-between font-semibold text-destructive">
+                                                        <span>Remaining Due</span>
+                                                        <span>₹{remainingBalance.toFixed(2)}</span>
+                                                    </div>
+                                                </>
+                                            )}
+
+                                            <Button
+                                                type="submit"
+                                                className="mt-4 w-full"
+                                                disabled={
+                                                    form.processing ||
+                                                    !form.data.membership_plan_id ||
+                                                    !form.data.start_date ||
+                                                    paymentIsInvalid ||
+                                                    (form.data.payment && !form.data.payment_method)
+                                                }
+                                            >
+                                                {form.processing ? (
+                                                    <Spinner data-icon="inline-start" />
+                                                ) : (
+                                                    <ShieldCheck data-icon="inline-start" className="size-4" />
+                                                )}
+                                                Create Membership
+                                            </Button>
+
+                                            <Button variant="ghost" size="sm" asChild className="w-full">
+                                                <Link href={members.show(member.id)}>Cancel</Link>
+                                            </Button>
+                                        </CardContent>
+                                    </Card>
                                 </div>
-                            </section>
-                        )}
-
-                        {/* Actions */}
-                        <div className="flex items-center justify-end gap-3">
-                            <Link
-                                href={members.show(member.id)}
-                                className="rounded-md border px-4 py-2 text-sm font-medium hover:bg-muted"
-                            >
-                                Cancel
-                            </Link>
-
-                            <button
-                                type="submit"
-                                disabled={
-                                    form.processing ||
-                                    !form.data.membership_plan_id ||
-                                    !form.data.start_date ||
-                                    paymentIsInvalid ||
-                                    (form.data.payment &&
-                                        !form.data.payment_method)
-                                }
-                                className="rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground disabled:cursor-not-allowed disabled:opacity-50"
-                            >
-                                {form.processing
-                                    ? 'Creating...'
-                                    : 'Create Membership'}
-                            </button>
+                            )}
                         </div>
                     </form>
                 )}

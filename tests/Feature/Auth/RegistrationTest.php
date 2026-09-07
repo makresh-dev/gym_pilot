@@ -28,6 +28,7 @@ class RegistrationTest extends TestCase
     {
         $response = $this->post(route('register.store'), [
             'name' => 'Test User',
+            'gym_name' => 'Iron Haven Gym',
             'email' => 'test@example.com',
             'password' => 'password',
             'password_confirmation' => 'password',
@@ -35,5 +36,33 @@ class RegistrationTest extends TestCase
 
         $this->assertAuthenticated();
         $response->assertRedirect(route('dashboard', absolute: false));
+    }
+
+    public function test_new_owner_can_register_with_upi_and_bank_details()
+    {
+        $response = $this->post(route('register.store'), [
+            'name' => 'John Gym Owner',
+            'gym_name' => 'Titan Fitness',
+            'email' => 'titan@fitness.test',
+            'password' => 'password',
+            'password_confirmation' => 'password',
+            'upi_id' => 'titanfitness@okaxis',
+            'bank_account_name' => 'Titan Fitness LLP',
+            'bank_name' => 'HDFC Bank',
+            'bank_account_number' => '50100234567890',
+            'bank_ifsc_code' => 'HDFC0001234',
+        ]);
+
+        $this->assertAuthenticated();
+        $response->assertRedirect(route('dashboard', absolute: false));
+
+        $this->assertDatabaseHas('organizations', [
+            'name' => 'Titan Fitness',
+            'upi_id' => 'titanfitness@okaxis',
+            'bank_account_name' => 'Titan Fitness LLP',
+            'bank_name' => 'HDFC Bank',
+            'bank_account_number' => '50100234567890',
+            'bank_ifsc_code' => 'HDFC0001234',
+        ]);
     }
 }

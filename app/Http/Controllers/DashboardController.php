@@ -2,11 +2,13 @@
 
 namespace App\Http\Controllers;
 
+use App\Enums\PaymentMethod;
 use App\Models\Attendance;
 use App\Models\FollowUpTask;
 use App\Models\Member;
 use App\Models\Membership;
 use App\Models\Organization;
+use App\Models\Payment;
 use App\Models\Signal;
 use App\Services\Intelligence\ActionRecommendationService;
 use Inertia\Inertia;
@@ -26,6 +28,11 @@ class DashboardController extends Controller
                 'id',
                 'name',
                 'attendance_qr_token',
+                'upi_id',
+                'bank_account_name',
+                'bank_name',
+                'bank_account_number',
+                'bank_ifsc_code',
             ])
             ->findOrFail($organizationId);
 
@@ -308,6 +315,97 @@ class DashboardController extends Controller
             ),
         ];
 
+        /*
+         * ------------------------------------------------------------------
+         * Payment receiving & collections summary
+         * ------------------------------------------------------------------
+         */
+
+        $totalReceived = (float) Payment::query()
+            ->where('organization_id', $organizationId)
+            ->sum('amount');
+
+        $todayReceived = (float) Payment::query()
+            ->where('organization_id', $organizationId)
+            ->whereDate('paid_at', $today)
+            ->sum('amount');
+
+        $thisMonthReceived = (float) Payment::query()
+            ->where('organization_id', $organizationId)
+            ->whereBetween('paid_at', [
+                $today->copy()->startOfMonth(),
+                $today->copy()->endOfMonth(),
+            ])
+            ->sum('amount');
+
+        $methodBreakdown = Payment::query()
+            ->where('organization_id', $organizationId)
+            ->selectRaw('payment_method, sum(amount) as total_amount, count(*) as count')
+            ->groupBy('payment_method')
+            ->get()
+            ->map(function ($item) {
+                $methodVal = $item->payment_method instanceof PaymentMethod
+                    ? $item->payment_method->value
+                    : (string) $item->payment_method;
+
+                $label = match ($methodVal) {
+                    'cash' => 'Cash',
+                    'upi' => 'UPI',
+                    'card' => 'Card',
+                    'bank_transfer' => 'Bank Transfer',
+                    default => ucfirst($methodVal),
+                };
+
+                return [
+                    'method' => $methodVal,
+                    'label' => $label,
+                    'total_amount' => (float) $item->total_amount,
+                    'count' => (int) $item->count,
+                ];
+            })
+            ->values();
+
+        $recentPayments = Payment::query()
+            ->where('organization_id', $organizationId)
+            ->with(['member:id,name,phone'])
+            ->latest('paid_at')
+            ->limit(6)
+            ->get()
+            ->map(function (Payment $payment) {
+                $methodVal = $payment->payment_method instanceof PaymentMethod
+                    ? $payment->payment_method->value
+                    : (string) $payment->payment_method;
+
+                return [
+                    'id' => $payment->id,
+                    'amount' => (float) $payment->amount,
+                    'payment_method' => $methodVal,
+                    'paid_at' => $payment->paid_at->toISOString(),
+                    'member' => [
+                        'id' => $payment->member?->id,
+                        'name' => $payment->member?->name ?? 'Unknown Member',
+                        'phone' => $payment->member?->phone,
+                    ],
+                ];
+            })
+            ->values();
+
+        $paymentReceiving = [
+            'organization_name' => $organization->name,
+            'upi_id' => $organization->upi_id,
+            'bank_account_name' => $organization->bank_account_name,
+            'bank_name' => $organization->bank_name,
+            'bank_account_number' => $organization->bank_account_number,
+            'bank_ifsc_code' => $organization->bank_ifsc_code,
+            'summary' => [
+                'total_received' => $totalReceived,
+                'today_received' => $todayReceived,
+                'this_month_received' => $thisMonthReceived,
+                'method_breakdown' => $methodBreakdown,
+                'recent_payments' => $recentPayments,
+            ],
+        ];
+
         return Inertia::render('dashboard', [
             'stats' => [
                 'active_members' => $activeMembers,
@@ -333,6 +431,8 @@ class DashboardController extends Controller
             'dailyWorkQueue' => $dailyWorkQueue,
 
             'attendanceQr' => $attendanceQr,
+
+            'paymentReceiving' => $paymentReceiving,
         ]);
     }
 }

@@ -1,7 +1,9 @@
 import { Form, Head } from '@inertiajs/react';
+import { Wallet } from 'lucide-react';
 import InputError from '@/components/input-error';
 import PasswordInput from '@/components/password-input';
 import TextLink from '@/components/text-link';
+import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -123,10 +125,115 @@ export default function Register({ passwordRules }: Props) {
                                 />
                             </div>
 
+                            {/* Optional Payment Details */}
+                            <div className="rounded-2xl border border-border/80 bg-muted/20 p-4 space-y-4 shadow-2xs">
+                                <div className="flex items-center justify-between">
+                                    <div className="flex items-center gap-2">
+                                        <Wallet className="size-4 text-primary" />
+                                        <span className="text-sm font-semibold tracking-tight text-foreground">
+                                            Payment Collection Details
+                                        </span>
+                                    </div>
+                                    <Badge variant="secondary" className="text-[11px] font-medium px-2 py-0.5 rounded-full">
+                                        Optional
+                                    </Badge>
+                                </div>
+                                <p className="text-xs text-muted-foreground leading-relaxed">
+                                    Provide your UPI ID and bank account details so members can pay fees directly to your gym. You can also update these anytime in Settings.
+                                </p>
+
+                                <div className="grid gap-3">
+                                    <div className="grid gap-1.5">
+                                        <Label htmlFor="upi_id" className="text-xs font-medium">
+                                            UPI ID (VPA)
+                                        </Label>
+                                        <Input
+                                            id="upi_id"
+                                            type="text"
+                                            tabIndex={6}
+                                            autoComplete="off"
+                                            name="upi_id"
+                                            placeholder="e.g. gymname@okaxis or 9876543210@paytm"
+                                        />
+                                        <InputError message={errors.upi_id} />
+                                    </div>
+
+                                    <div className="relative my-1 flex items-center justify-center">
+                                        <div className="absolute inset-0 flex items-center">
+                                            <span className="w-full border-t border-border/60" />
+                                        </div>
+                                        <span className="relative bg-muted/60 px-2 text-[10px] uppercase tracking-wider text-muted-foreground font-semibold rounded">
+                                            Bank Details
+                                        </span>
+                                    </div>
+
+                                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                                        <div className="grid gap-1.5">
+                                            <Label htmlFor="bank_account_name" className="text-xs font-medium">
+                                                Account Holder Name
+                                            </Label>
+                                            <Input
+                                                id="bank_account_name"
+                                                type="text"
+                                                tabIndex={7}
+                                                name="bank_account_name"
+                                                placeholder="Name as per bank"
+                                            />
+                                            <InputError message={errors.bank_account_name} />
+                                        </div>
+
+                                        <div className="grid gap-1.5">
+                                            <Label htmlFor="bank_name" className="text-xs font-medium">
+                                                Bank Name
+                                            </Label>
+                                            <Input
+                                                id="bank_name"
+                                                type="text"
+                                                tabIndex={8}
+                                                name="bank_name"
+                                                placeholder="e.g. HDFC Bank, SBI"
+                                            />
+                                            <InputError message={errors.bank_name} />
+                                        </div>
+                                    </div>
+
+                                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                                        <div className="grid gap-1.5">
+                                            <Label htmlFor="bank_account_number" className="text-xs font-medium">
+                                                Account Number
+                                            </Label>
+                                            <Input
+                                                id="bank_account_number"
+                                                type="text"
+                                                tabIndex={9}
+                                                name="bank_account_number"
+                                                placeholder="Bank account number"
+                                            />
+                                            <InputError message={errors.bank_account_number} />
+                                        </div>
+
+                                        <div className="grid gap-1.5">
+                                            <Label htmlFor="bank_ifsc_code" className="text-xs font-medium">
+                                                IFSC Code
+                                            </Label>
+                                            <Input
+                                                id="bank_ifsc_code"
+                                                type="text"
+                                                tabIndex={10}
+                                                name="bank_ifsc_code"
+                                                placeholder="e.g. HDFC0001234"
+                                                className="uppercase"
+                                            />
+                                            <InputError message={errors.bank_ifsc_code} />
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+
                             <Button
                                 type="submit"
                                 className="mt-2 w-full"
-                                tabIndex={6}
+                                tabIndex={11}
                                 data-test="register-user-button"
                             >
                                 {processing && <Spinner />}
@@ -136,7 +243,7 @@ export default function Register({ passwordRules }: Props) {
 
                         <div className="text-muted-foreground text-center text-sm">
                             Already have an account?{' '}
-                            <TextLink href={login()} tabIndex={7}>
+                            <TextLink href={login()} tabIndex={12}>
                                 Log in
                             </TextLink>
                         </div>

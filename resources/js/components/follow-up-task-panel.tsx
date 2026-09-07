@@ -1,9 +1,29 @@
 import { router } from '@inertiajs/react';
+import {
+    AlertCircle,
+    Calendar,
+    CheckCircle2,
+    Clock,
+    RotateCcw,
+    User,
+    XCircle,
+} from 'lucide-react';
 import { useMemo, useState } from 'react';
+import { Badge } from '@/components/ui/badge';
+import { Button } from '@/components/ui/button';
+import {
+    Card,
+    CardContent,
+    CardDescription,
+    CardHeader,
+    CardTitle,
+} from '@/components/ui/card';
+import { Spinner } from '@/components/ui/spinner';
+import { Textarea } from '@/components/ui/textarea';
 
 type FollowUpTaskStatus = 'pending' | 'completed' | 'skipped';
 
-type FollowUpTask = {
+export type FollowUpTask = {
     id: string;
     member_id: string;
     intervention_id: string | null;
@@ -20,7 +40,7 @@ type FollowUpTask = {
         type: string;
         notes: string | null;
         outcome: string | null;
-        intervened_at: string;
+        intervened_at: string | null;
     } | null;
 };
 
@@ -88,25 +108,50 @@ function getInterventionLabel(type?: string): string {
     }
 }
 
-function getStateLabel(state: ReturnType<typeof getTaskState>): string {
+function getStateBadge(state: ReturnType<typeof getTaskState>) {
     switch (state) {
         case 'overdue':
-            return 'Overdue';
+            return (
+                <Badge variant="destructive" className="gap-1">
+                    <AlertCircle className="size-3" />
+                    Overdue
+                </Badge>
+            );
         case 'today':
-            return 'Due today';
+            return (
+                <Badge variant="outline" className="gap-1 border-amber-500/30 text-amber-600 dark:text-amber-400">
+                    <Clock className="size-3" />
+                    Due today
+                </Badge>
+            );
         case 'upcoming':
-            return 'Upcoming';
+            return (
+                <Badge variant="secondary" className="gap-1">
+                    <Calendar className="size-3" />
+                    Upcoming
+                </Badge>
+            );
         case 'completed':
-            return 'Completed';
+            return (
+                <Badge variant="outline" className="gap-1 border-emerald-500/30 text-emerald-600 dark:text-emerald-400">
+                    <CheckCircle2 className="size-3" />
+                    Completed
+                </Badge>
+            );
         case 'skipped':
-            return 'Skipped';
+            return (
+                <Badge variant="secondary" className="gap-1 text-muted-foreground">
+                    <XCircle className="size-3" />
+                    Skipped
+                </Badge>
+            );
     }
 }
 
 export default function FollowUpTaskPanel({
     tasks,
     memberId,
-    title = 'Follow-ups',
+    title = 'Follow-up Tasks',
 }: FollowUpTaskPanelProps) {
     const [expandedTaskId, setExpandedTaskId] = useState<string | null>(null);
     const [notesByTask, setNotesByTask] = useState<Record<string, string>>({});
@@ -126,7 +171,6 @@ export default function FollowUpTaskPanel({
             const stateB = getTaskState(b);
 
             const orderDifference = stateOrder[stateA] - stateOrder[stateB];
-
             if (orderDifference !== 0) {
                 return orderDifference;
             }
@@ -189,166 +233,169 @@ export default function FollowUpTaskPanel({
         ? sortedTasks.filter((task) => task.member_id === memberId)
         : sortedTasks;
 
+    const overdueCount = visibleTasks.filter((t) => getTaskState(t) === 'overdue').length;
+
     return (
-        <section className="rounded-lg border p-5">
-            <div className="flex items-start justify-between gap-4">
+        <Card>
+            <CardHeader className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between border-b pb-4">
                 <div>
-                    <h2 className="text-lg font-semibold">{title}</h2>
-                    <p className="mt-1 text-sm text-muted-foreground">
-                        Persistent tasks created from member interventions.
-                    </p>
+                    <CardTitle className="text-base font-semibold">{title}</CardTitle>
+                    <CardDescription>
+                        Action items scheduled from retention signals and staff interventions.
+                    </CardDescription>
                 </div>
 
-                <span className="text-sm text-muted-foreground">
-                    {visibleTasks.filter((task) => getTaskState(task) === 'overdue').length}{' '}
-                    overdue · {visibleTasks.length} total
-                </span>
-            </div>
-
-            {visibleTasks.length === 0 ? (
-                <div className="mt-5 rounded-lg border border-dashed p-6 text-center">
-                    <p className="font-medium">No follow-ups.</p>
-                    <p className="mt-1 text-sm text-muted-foreground">
-                        Follow-ups will appear here after an intervention is recorded.
-                    </p>
+                <div className="flex items-center gap-2">
+                    {overdueCount > 0 && (
+                        <Badge variant="destructive">{overdueCount} overdue</Badge>
+                    )}
+                    <Badge variant="secondary">{visibleTasks.length} total</Badge>
                 </div>
-            ) : (
-                <div className="mt-5 space-y-3">
-                    {visibleTasks.map((task) => {
-                        const state = getTaskState(task);
-                        const expanded = expandedTaskId === task.id;
-                        const processing = processingTaskId === task.id;
+            </CardHeader>
 
-                        return (
-                            <article
-                                key={task.id}
-                                className="rounded-lg border p-4"
-                            >
-                                <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
-                                    <div className="min-w-0">
-                                        <div className="flex flex-wrap items-center gap-2">
-                                            <span
-                                                className={`rounded-full border px-2.5 py-1 text-xs font-medium ${state === 'overdue'
-                                                        ? 'border-destructive/30 text-destructive'
-                                                        : state === 'today'
-                                                            ? 'border-amber-500/30 text-amber-600 dark:text-amber-400'
-                                                            : state === 'completed'
-                                                                ? 'border-emerald-500/30 text-emerald-600 dark:text-emerald-400'
-                                                                : 'border-border text-muted-foreground'
-                                                    }`}
-                                            >
-                                                {getStateLabel(state)}
-                                            </span>
+            <CardContent className="p-4 sm:p-6">
+                {visibleTasks.length === 0 ? (
+                    <div className="flex flex-col items-center justify-center p-8 text-center">
+                        <Clock className="size-8 text-muted-foreground/40" />
+                        <p className="mt-3 text-sm font-semibold">No follow-ups scheduled</p>
+                        <p className="mt-1 text-xs text-muted-foreground">
+                            Scheduled follow-ups created during member touchpoints will appear here.
+                        </p>
+                    </div>
+                ) : (
+                    <div className="flex flex-col gap-3">
+                        {visibleTasks.map((task) => {
+                            const state = getTaskState(task);
+                            const expanded = expandedTaskId === task.id;
+                            const processing = processingTaskId === task.id;
 
-                                            <span className="text-sm font-medium">
-                                                {formatDate(task.due_date)}
-                                            </span>
+                            return (
+                                <Card key={task.id} className="transition hover:border-primary/40">
+                                    <CardContent className="flex flex-col gap-3 p-4">
+                                        <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
+                                            <div className="flex flex-col gap-1.5">
+                                                <div className="flex flex-wrap items-center gap-2">
+                                                    {getStateBadge(state)}
+                                                    <span className="text-xs font-semibold text-foreground">
+                                                        Due {formatDate(task.due_date)}
+                                                    </span>
+                                                </div>
+
+                                                {!memberId && task.member && (
+                                                    <div className="flex items-center gap-1.5 font-medium text-sm">
+                                                        <User className="size-3.5 text-muted-foreground" />
+                                                        {task.member.name}
+                                                    </div>
+                                                )}
+                                            </div>
+
+                                            {/* Action buttons */}
+                                            <div className="flex items-center gap-2 self-end sm:self-start">
+                                                {state !== 'completed' && state !== 'skipped' && !expanded && (
+                                                    <>
+                                                        <Button
+                                                            size="sm"
+                                                            onClick={() => setExpandedTaskId(task.id)}
+                                                        >
+                                                            Resolve Task
+                                                        </Button>
+                                                        <Button
+                                                            variant="outline"
+                                                            size="sm"
+                                                            disabled={processing}
+                                                            onClick={() => finishTask(task, 'skip')}
+                                                        >
+                                                            Skip
+                                                        </Button>
+                                                    </>
+                                                )}
+
+                                                {(state === 'completed' || state === 'skipped') && (
+                                                    <Button
+                                                        variant="ghost"
+                                                        size="sm"
+                                                        disabled={processing}
+                                                        onClick={() => reopenTask(task)}
+                                                    >
+                                                        {processing ? (
+                                                            <Spinner data-icon="inline-start" />
+                                                        ) : (
+                                                            <RotateCcw data-icon="inline-start" className="size-3.5" />
+                                                        )}
+                                                        Reopen
+                                                    </Button>
+                                                )}
+                                            </div>
                                         </div>
 
-                                        <p className="mt-2 font-medium">
-                                            {task.member?.name ?? 'Member'}
-                                        </p>
-
-                                        {task.intervention?.type && (
-                                            <p className="mt-1 text-sm text-muted-foreground">
+                                        {/* Intervention context if available */}
+                                        {task.intervention && (
+                                            <div className="rounded-md bg-muted/40 p-3 text-xs text-muted-foreground">
+                                                <span className="font-semibold text-foreground">
+                                                    Origin:{' '}
+                                                </span>
                                                 {getInterventionLabel(task.intervention.type)}
-                                            </p>
+                                                {task.intervention.notes && ` — "${task.intervention.notes}"`}
+                                                {task.intervention.outcome && (
+                                                    <span className="block mt-1 font-medium text-foreground">
+                                                        Previous outcome: {task.intervention.outcome}
+                                                    </span>
+                                                )}
+                                            </div>
                                         )}
 
-                                        {task.intervention?.notes && (
-                                            <p className="mt-2 text-sm text-muted-foreground">
-                                                {task.intervention.notes}
-                                            </p>
-                                        )}
+                                        {/* Resolution expansion */}
+                                        {expanded && (
+                                            <div className="mt-2 flex flex-col gap-3 border-t pt-3">
+                                                <Textarea
+                                                    placeholder="Add completion notes or member response (optional)..."
+                                                    value={notesByTask[task.id] || ''}
+                                                    onChange={(e) => updateNotes(task.id, e.target.value)}
+                                                    className="min-h-20"
+                                                />
 
-                                        {task.completion_notes && (
-                                            <p className="mt-2 text-sm text-muted-foreground">
-                                                <span className="font-medium text-foreground">
-                                                    Notes:
-                                                </span>{' '}
-                                                {task.completion_notes}
-                                            </p>
-                                        )}
-                                    </div>
-
-                                    <div className="flex shrink-0 flex-wrap gap-2">
-                                        {task.member_id && (
-                                            <a
-                                                href={`/members/${task.member_id}`}
-                                                className="rounded-md border px-3 py-2 text-sm font-medium"
-                                            >
-                                                Open member
-                                            </a>
-                                        )}
-
-                                        {task.status === 'pending' ? (
-                                            <>
-                                                <button
-                                                    type="button"
-                                                    disabled={processing}
-                                                    onClick={() => setExpandedTaskId(expanded ? null : task.id)}
-                                                    className="rounded-md border px-3 py-2 text-sm font-medium disabled:cursor-not-allowed disabled:opacity-50"
-                                                >
-                                                    {expanded ? 'Close' : 'Finish'}
-                                                </button>
-
-                                                {expanded && (
-                                                    <button
-                                                        type="button"
+                                                <div className="flex items-center justify-end gap-2">
+                                                    <Button
+                                                        variant="ghost"
+                                                        size="sm"
+                                                        onClick={() => setExpandedTaskId(null)}
+                                                    >
+                                                        Cancel
+                                                    </Button>
+                                                    <Button
+                                                        variant="outline"
+                                                        size="sm"
+                                                        disabled={processing}
+                                                        onClick={() => finishTask(task, 'skip')}
+                                                    >
+                                                        Mark as Skipped
+                                                    </Button>
+                                                    <Button
+                                                        size="sm"
                                                         disabled={processing}
                                                         onClick={() => finishTask(task, 'complete')}
-                                                        className="rounded-md bg-primary px-3 py-2 text-sm font-medium text-primary-foreground disabled:cursor-not-allowed disabled:opacity-50"
                                                     >
-                                                        {processing ? 'Saving…' : 'Complete'}
-                                                    </button>
-                                                )}
-                                            </>
-                                        ) : (
-                                            <button
-                                                type="button"
-                                                disabled={processing}
-                                                onClick={() => reopenTask(task)}
-                                                className="rounded-md border px-3 py-2 text-sm font-medium disabled:cursor-not-allowed disabled:opacity-50"
-                                            >
-                                                {processing ? 'Saving…' : 'Reopen'}
-                                            </button>
+                                                        {processing && <Spinner data-icon="inline-start" />}
+                                                        Complete Task
+                                                    </Button>
+                                                </div>
+                                            </div>
                                         )}
-                                    </div>
-                                </div>
 
-                                {expanded && task.status === 'pending' && (
-                                    <div className="mt-4 border-t pt-4">
-                                        <label className="text-sm font-medium">
-                                            Completion notes
-                                        </label>
-                                        <textarea
-                                            value={notesByTask[task.id] ?? ''}
-                                            onChange={(event) =>
-                                                updateNotes(task.id, event.target.value)
-                                            }
-                                            rows={3}
-                                            maxLength={5000}
-                                            placeholder="What happened during the follow-up?"
-                                            className="mt-2 w-full rounded-md border bg-background px-3 py-2 text-sm outline-none ring-offset-background placeholder:text-muted-foreground focus:ring-2 focus:ring-ring"
-                                        />
-
-                                        <div className="mt-3 flex flex-wrap gap-2">
-                                            <button
-                                                type="button"
-                                                disabled={processing}
-                                                onClick={() => finishTask(task, 'skip')}
-                                                className="rounded-md border px-3 py-2 text-sm font-medium text-muted-foreground disabled:cursor-not-allowed disabled:opacity-50"
-                                            >
-                                                Skip instead
-                                            </button>
-                                        </div>
-                                    </div>
-                                )}
-                            </article>
-                        );
-                    })}
-                </div>
-            )}
-        </section>
+                                        {/* Completion notes display */}
+                                        {task.completion_notes && (
+                                            <div className="rounded-md border bg-muted/20 p-2.5 text-xs text-muted-foreground">
+                                                <span className="font-semibold text-foreground">Resolution notes: </span>
+                                                {task.completion_notes}
+                                            </div>
+                                        )}
+                                    </CardContent>
+                                </Card>
+                            );
+                        })}
+                    </div>
+                )}
+            </CardContent>
+        </Card>
     );
 }

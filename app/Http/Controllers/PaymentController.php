@@ -33,6 +33,7 @@ class PaymentController extends Controller
         );
 
         $membership->load('membershipPlan');
+        $member->loadMissing('organization');
 
         $membership->append([
             'lifecycle_status',
@@ -60,6 +61,14 @@ class PaymentController extends Controller
                 'amount_paid' => (float) $membership->amount_paid,
                 'balance_due' => (float) $membership->balance_due,
                 'lifecycle_status' => $membership->lifecycle_status,
+            ],
+            'organization' => [
+                'name' => $member->organization?->name,
+                'upi_id' => $member->organization?->upi_id,
+                'bank_account_name' => $member->organization?->bank_account_name,
+                'bank_name' => $member->organization?->bank_name,
+                'bank_account_number' => $member->organization?->bank_account_number,
+                'bank_ifsc_code' => $member->organization?->bank_ifsc_code,
             ],
             'payment_methods' => collect(PaymentMethod::cases())
                 ->map(fn (PaymentMethod $method) => [

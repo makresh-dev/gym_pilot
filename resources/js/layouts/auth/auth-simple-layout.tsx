@@ -10,15 +10,28 @@ export default function AuthSimpleLayout({
 }: AuthLayoutProps) {
     return (
         <div className="bg-background flex min-h-svh flex-col items-center justify-center gap-6 p-6 md:p-10">
-            <div className="w-full max-w-sm">
+            <div className="w-full max-w-sm md:max-w-md">
                 <div className="flex flex-col gap-8">
                     <div className="flex flex-col items-center gap-4">
                         <Link
                             href={home()}
-                            className="flex flex-col items-center gap-2 font-medium"
+                            className="group flex flex-col items-center gap-2 font-medium"
                         >
-                            <div className="mb-1 flex h-9 w-9 items-center justify-center rounded-md">
-                                <AppLogoIcon className="size-9 fill-current text-[var(--foreground)] dark:text-white" />
+                            <div className="relative mb-1 flex items-center justify-center">
+                                <div className="absolute -inset-2 rounded-full bg-emerald-500/20 blur-lg dark:bg-emerald-500/10" />
+                                <img
+                                    src="/images/gympilot-logo.png"
+                                    alt="GymPilot"
+                                    className="relative size-16 rounded-2xl object-contain border border-border/80 bg-white dark:bg-card p-1 shadow-xs transition-transform duration-200 group-hover:scale-105"
+                                />
+                            </div>
+                            <div className="flex flex-col items-center">
+                                <span className="text-base font-bold tracking-tight text-foreground">
+                                    GymPilot
+                                </span>
+                                <span className="text-[10px] font-medium text-muted-foreground uppercase tracking-wider">
+                                    Smart Fitness Technology
+                                </span>
                             </div>
                             <span className="sr-only">{title}</span>
                         </Link>

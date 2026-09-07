@@ -4,10 +4,49 @@ import {
     AlertCircle,
     CheckCircle2,
     Clock3,
+    ArrowLeft,
+    ChevronLeft,
+    ChevronRight,
+    TrendingUp,
+    TrendingDown,
+    Minus,
+    AlertTriangle,
+    CreditCard,
+    Calendar as CalendarIcon,
+    User,
+    Check,
+    Archive,
+    Edit3,
+    RefreshCw,
+    Plus,
+    Activity,
+    Target,
 } from 'lucide-react';
 import { dashboard } from '@/routes';
 import members from '@/routes/members';
 import FollowUpTaskPanel from '@/components/follow-up-task-panel';
+import { Button } from '@/components/ui/button';
+import { Badge } from '@/components/ui/badge';
+import {
+    Card,
+    CardContent,
+    CardDescription,
+    CardHeader,
+    CardTitle,
+} from '@/components/ui/card';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import { Textarea } from '@/components/ui/textarea';
+import {
+    Table,
+    TableBody,
+    TableCell,
+    TableHead,
+    TableHeader,
+    TableRow,
+} from '@/components/ui/table';
+import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
+import { Spinner } from '@/components/ui/spinner';
 
 type Payment = {
     id: string;
@@ -314,35 +353,36 @@ function getDismissalReasonLabel(reason: string): string {
 
 function getSignalStatusPresentation(status: string): {
     label: string;
+    badgeVariant: 'default' | 'outline' | 'secondary' | 'destructive';
     className: string;
 } {
     switch (status) {
         case 'open':
             return {
                 label: 'Open',
-                className:
-                    'border-destructive/30 text-destructive',
+                badgeVariant: 'destructive',
+                className: '',
             };
 
         case 'resolved':
             return {
                 label: 'Resolved',
-                className:
-                    'border-emerald-500/30 text-emerald-600 dark:text-emerald-400',
+                badgeVariant: 'outline',
+                className: 'border-emerald-500/30 text-emerald-600 dark:text-emerald-400 bg-emerald-500/10',
             };
 
         case 'dismissed':
             return {
                 label: 'Dismissed',
-                className:
-                    'border-muted-foreground/30 text-muted-foreground',
+                badgeVariant: 'secondary',
+                className: 'text-muted-foreground',
             };
 
         default:
             return {
                 label: status.replace(/_/g, ' '),
-                className:
-                    'border-border text-muted-foreground',
+                badgeVariant: 'outline',
+                className: '',
             };
     }
 }
@@ -350,31 +390,32 @@ function getSignalStatusPresentation(status: string): {
 function getSeverityPresentation(
     severity: string,
 ): {
+    badgeVariant: 'default' | 'outline' | 'secondary' | 'destructive';
     className: string;
 } {
     switch (severity) {
         case 'high':
             return {
-                className:
-                    'border-destructive/30 text-destructive',
+                badgeVariant: 'destructive',
+                className: '',
             };
 
         case 'medium':
             return {
-                className:
-                    'border-amber-500/30 text-amber-600 dark:text-amber-400',
+                badgeVariant: 'outline',
+                className: 'border-amber-500/30 text-amber-600 dark:text-amber-400 bg-amber-500/10',
             };
 
         case 'low':
             return {
-                className:
-                    'border-muted-foreground/30 text-muted-foreground',
+                badgeVariant: 'secondary',
+                className: '',
             };
 
         default:
             return {
-                className:
-                    'border-border text-muted-foreground',
+                badgeVariant: 'outline',
+                className: '',
             };
     }
 }
@@ -495,37 +536,6 @@ function formatTimelineEventTime(
     );
 }
 
-function groupTimelineByDay(
-    timeline: TimelineEvent[],
-): {
-    date: string;
-    events: TimelineEvent[];
-}[] {
-    const groups = new Map<
-        string,
-        TimelineEvent[]
-    >();
-
-    for (const event of timeline) {
-        const day = getTimelineDay(event);
-
-        const existing = groups.get(day);
-
-        if (existing) {
-            existing.push(event);
-        } else {
-            groups.set(day, [event]);
-        }
-    }
-
-    return Array.from(groups.entries()).map(
-        ([date, events]) => ({
-            date,
-            events,
-        }),
-    );
-}
-
 function getTimelineTitle(
     event: TimelineEvent,
 ): string {
@@ -629,46 +639,37 @@ function MembershipStatusBadge({
 }: {
     status: OperationalStatus['membership_status'];
 }) {
-    const config = {
-        active: {
-            label: 'Active',
-            className:
-                'bg-emerald-50 text-emerald-700 ring-emerald-600/20 dark:bg-emerald-950/40 dark:text-emerald-300',
-            icon: CheckCircle2,
-        },
-        expiring: {
-            label: 'Expiring',
-            className:
-                'bg-amber-50 text-amber-700 ring-amber-600/20 dark:bg-amber-950/40 dark:text-amber-300',
-            icon: Clock3,
-        },
-        expired: {
-            label: 'Expired',
-            className:
-                'bg-red-50 text-red-700 ring-red-600/20 dark:bg-red-950/40 dark:text-red-300',
-            icon: AlertCircle,
-        },
-        none: {
-            label: 'No Membership',
-            className:
-                'bg-muted text-muted-foreground ring-border',
-            icon: AlertCircle,
-        },
-    }[status];
-
-    const Icon = config.icon;
-
-    return (
-        <span
-            className={[
-                'inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-xs font-medium ring-1 ring-inset',
-                config.className,
-            ].join(' ')}
-        >
-            <Icon className="h-3.5 w-3.5" />
-            {config.label}
-        </span>
-    );
+    switch (status) {
+        case 'active':
+            return (
+                <Badge variant="outline" className="border-emerald-500/30 bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 gap-1.5 px-3 py-1 text-xs">
+                    <CheckCircle2 className="h-3.5 w-3.5" />
+                    Active
+                </Badge>
+            );
+        case 'expiring':
+            return (
+                <Badge variant="outline" className="border-amber-500/30 bg-amber-500/10 text-amber-600 dark:text-amber-400 gap-1.5 px-3 py-1 text-xs">
+                    <Clock3 className="h-3.5 w-3.5" />
+                    Expiring
+                </Badge>
+            );
+        case 'expired':
+            return (
+                <Badge variant="destructive" className="gap-1.5 px-3 py-1 text-xs">
+                    <AlertCircle className="h-3.5 w-3.5" />
+                    Expired
+                </Badge>
+            );
+        case 'none':
+        default:
+            return (
+                <Badge variant="secondary" className="gap-1.5 px-3 py-1 text-xs">
+                    <AlertCircle className="h-3.5 w-3.5" />
+                    No Membership
+                </Badge>
+            );
+    }
 }
 
 function FinancialStatusBadge({
@@ -680,16 +681,16 @@ function FinancialStatusBadge({
 }) {
     if (status === 'paid') {
         return (
-            <span className="text-sm text-muted-foreground">
-                Paid
-            </span>
+            <Badge variant="outline" className="border-emerald-500/30 bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 text-xs px-2.5 py-1">
+                Fully Paid
+            </Badge>
         );
     }
 
     return (
-        <span className="text-sm font-medium text-orange-700 dark:text-orange-300">
+        <Badge variant="outline" className="border-amber-500/30 bg-amber-500/10 text-amber-600 dark:text-amber-400 text-xs px-2.5 py-1 font-semibold">
             ₹{balanceDue.toLocaleString('en-IN')} outstanding
-        </span>
+        </Badge>
     );
 }
 
@@ -782,27 +783,31 @@ function getAttendanceSnapshot(
 
 function getAttendanceTrendPresentation(
     trend: AttendanceSnapshot['trend'],
-): { label: string; className: string } {
+): { label: string; className: string; icon: typeof TrendingUp } {
     switch (trend) {
         case 'improving':
             return {
                 label: 'Improving',
                 className: 'text-emerald-600 dark:text-emerald-400',
+                icon: TrendingUp,
             };
         case 'declining':
             return {
                 label: 'Declining',
                 className: 'text-destructive',
+                icon: TrendingDown,
             };
         case 'stable':
             return {
                 label: 'Stable',
                 className: 'text-muted-foreground',
+                icon: Minus,
             };
         default:
             return {
                 label: 'Not enough data',
                 className: 'text-muted-foreground',
+                icon: Minus,
             };
     }
 }
@@ -842,6 +847,7 @@ export default function Show({
     const attendanceTrend = getAttendanceTrendPresentation(
         attendanceSnapshot.trend,
     );
+    const TrendIcon = attendanceTrend.icon;
 
     const openSignals = member.signals.filter(
         (signal) => signal.status === 'open',
@@ -1022,1606 +1028,1119 @@ export default function Show({
         );
     }
 
+    const contextErrors = contextForm.errors as Record<string, string | undefined>;
+
     return (
         <>
             <Head title={member.name} />
 
-            <div className="mx-auto max-w-6xl p-6">
-                {/* Header */}
-                <div className="mb-6">
-                    <Link
-                        href={members.index()}
-                        className="text-sm text-muted-foreground hover:underline"
-                    >
-                        ← Back to Members
-                    </Link>
-
-                    <div className="mt-4">
-                        <h1 className="text-3xl font-semibold">
-                            {member.name}
-                        </h1>
-
-                        <p className="mt-1 text-sm text-muted-foreground">
-                            {member.phone}
-
-                            {member.email
-                                ? ` · ${member.email}`
-                                : ''}
-                        </p>
-                    </div>
-
-                    <div className="mt-4 flex flex-wrap items-center gap-3">
-                        <MembershipStatusBadge
-                            status={operationalStatus.membership_status}
-                        />
-
-                        {operationalStatus.membership_expires_at && (
-                            <span className="text-sm text-muted-foreground">
-                                {operationalStatus.membership_status ===
-                                    'expired'
-                                    ? `Expired ${formatDate(
-                                        operationalStatus.membership_expires_at,
-                                    )}`
-                                    : `Ends ${formatDate(
-                                        operationalStatus.membership_expires_at,
-                                    )}`}
-                            </span>
-                        )}
-
-                        <FinancialStatusBadge
-                            status={operationalStatus.financial_status}
-                            balanceDue={operationalStatus.balance_due}
-                        />
-                    </div>
-
-                    <div className="mt-4 flex flex-wrap gap-2">
-                        <div>
-                            <button
-                                type="button"
-                                disabled={
-                                    checkedInToday ||
-                                    checkingIn ||
-                                    !hasActiveMembership
-                                }
-                                onClick={handleCheckIn}
-                                className="rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground disabled:cursor-not-allowed disabled:opacity-50"
-                            >
-                                {checkedInToday
-                                    ? 'Checked In Today'
-                                    : checkingIn
-                                        ? 'Checking In...'
-                                        : 'Check In'}
-                            </button>
-
-                            {checkInError ? (
-                                <p className="mt-2 text-sm text-destructive">
-                                    {checkInError}
-                                </p>
-                            ) : !hasActiveMembership ? (
-                                <p className="mt-2 text-sm text-muted-foreground">
-                                    Add an active membership before checking in.
-                                </p>
-                            ) : null}
+            <div className="mx-auto max-w-7xl flex flex-col gap-6 p-4 sm:p-6 w-full pb-12">
+                {/* Header Card */}
+                <Card className="overflow-hidden border-border shadow-xs">
+                    <CardHeader className="flex flex-col gap-4 pb-5">
+                        <div className="flex items-center gap-2">
+                            <Button variant="ghost" size="sm" asChild className="gap-1 px-2 text-muted-foreground hover:text-foreground">
+                                <Link href={members.index()}>
+                                    <ArrowLeft className="h-4 w-4" />
+                                    <span>Back to Members</span>
+                                </Link>
+                            </Button>
                         </div>
 
-                        {operationalStatus.membership_status !== 'active' &&
-                            operationalStatus.membership_status !== 'expiring' && (
-                                <Link
-                                    href={members.memberships.create(
-                                        member.id,
-                                    )}
-                                    className="rounded-md border px-4 py-2 text-sm font-medium"
-                                >
-                                    Add Membership
-                                </Link>
-                            )}
+                        <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
+                            {/* Member Identity & Status Badges */}
+                            <div className="flex items-start gap-4">
+                                <div className="flex h-14 w-14 shrink-0 items-center justify-center rounded-full bg-primary/10 text-primary font-extrabold text-xl shadow-inner">
+                                    {member.name.charAt(0).toUpperCase()}
+                                </div>
+                                <div className="flex flex-col gap-1.5">
+                                    <div>
+                                        <CardTitle className="text-2xl sm:text-3xl font-bold tracking-tight">
+                                            {member.name}
+                                        </CardTitle>
+                                        <CardDescription className="text-sm font-medium mt-0.5 text-muted-foreground">
+                                            {member.phone}
+                                            {member.email ? ` · ${member.email}` : ''}
+                                        </CardDescription>
+                                    </div>
 
-                        {currentMembership &&
-                            currentBalance > 0 && (
-                                <Link
-                                    href={
-                                        members
-                                            .memberships
-                                            .payments
-                                            .create([
+                                    <div className="flex flex-wrap items-center gap-2 pt-1">
+                                        <MembershipStatusBadge status={operationalStatus.membership_status} />
+
+                                        {operationalStatus.membership_expires_at && (
+                                            <span className="text-xs text-muted-foreground font-medium">
+                                                {operationalStatus.membership_status === 'expired'
+                                                    ? `Expired ${formatDate(operationalStatus.membership_expires_at)}`
+                                                    : `Ends ${formatDate(operationalStatus.membership_expires_at)}`}
+                                            </span>
+                                        )}
+
+                                        <FinancialStatusBadge
+                                            status={operationalStatus.financial_status}
+                                            balanceDue={operationalStatus.balance_due}
+                                        />
+                                    </div>
+                                </div>
+                            </div>
+
+                            {/* Action Bar */}
+                            <div className="flex flex-wrap items-center gap-2 pt-1 lg:pt-0 shrink-0">
+                                <Button
+                                    type="button"
+                                    disabled={checkedInToday || checkingIn || !hasActiveMembership}
+                                    onClick={handleCheckIn}
+                                    variant={checkedInToday ? "secondary" : "default"}
+                                    className="gap-2 h-10 px-4 font-semibold"
+                                >
+                                    {checkingIn ? (
+                                        <>
+                                            <Spinner className="h-4 w-4" />
+                                            <span>Checking In...</span>
+                                        </>
+                                    ) : checkedInToday ? (
+                                        <>
+                                            <Check className="h-4 w-4 text-emerald-500" />
+                                            <span>Checked In Today</span>
+                                        </>
+                                    ) : (
+                                        <>
+                                            <CheckCircle2 className="h-4 w-4" />
+                                            <span>Check In</span>
+                                        </>
+                                    )}
+                                </Button>
+
+                                {operationalStatus.membership_status !== 'active' &&
+                                    operationalStatus.membership_status !== 'expiring' && (
+                                        <Button variant="outline" asChild className="gap-1.5 h-10">
+                                            <Link href={members.memberships.create(member.id)}>
+                                                <Plus className="h-4 w-4" />
+                                                <span>Add Membership</span>
+                                            </Link>
+                                        </Button>
+                                    )}
+
+                                {currentMembership && currentBalance > 0 && (
+                                    <Button variant="outline" asChild className="gap-1.5 h-10">
+                                        <Link
+                                            href={members.memberships.payments.create([
                                                 member.id,
                                                 currentMembership.id,
-                                            ])
-                                    }
-                                    className="rounded-md border px-4 py-2 text-sm font-medium"
+                                            ])}
+                                        >
+                                            <CreditCard className="h-4 w-4" />
+                                            <span>Record Payment</span>
+                                        </Link>
+                                    </Button>
+                                )}
+
+                                {operationalStatus.membership_status !== 'none' &&
+                                    operationalStatus.membership_status !== 'active' && (
+                                        <Button variant="outline" asChild className="gap-1.5 h-10">
+                                            <Link
+                                                href={
+                                                    currentMembership
+                                                        ? `/members/${member.id}/memberships/${currentMembership.id}/renew`
+                                                        : latestExpiredMembership
+                                                            ? `/members/${member.id}/memberships/${latestExpiredMembership.id}/renew`
+                                                            : members.memberships.create(member.id)
+                                                }
+                                            >
+                                                <RefreshCw className="h-4 w-4" />
+                                                <span>Renew</span>
+                                            </Link>
+                                        </Button>
+                                    )}
+
+                                <Button variant="outline" size="icon" asChild title="Edit Member" className="h-10 w-10">
+                                    <Link href={members.edit(member.id)}>
+                                        <Edit3 className="h-4 w-4" />
+                                    </Link>
+                                </Button>
+
+                                <Button
+                                    variant="outline"
+                                    size="icon"
+                                    type="button"
+                                    title="Archive Member"
+                                    className="h-10 w-10 text-destructive hover:text-destructive hover:bg-destructive/10"
+                                    onClick={() => {
+                                        if (
+                                            window.confirm(
+                                                `Archive ${member.name}? Their historical data will be preserved.`,
+                                            )
+                                        ) {
+                                            router.delete(members.destroy(member.id).url);
+                                        }
+                                    }}
                                 >
-                                    Record Payment
-                                </Link>
-                            )}
+                                    <Archive className="h-4 w-4" />
+                                </Button>
+                            </div>
+                        </div>
 
-                        {operationalStatus.membership_status !== 'none' &&
-                            operationalStatus.membership_status !== 'active' && (
-                                <Link
-                                    href={
-                                        currentMembership
-                                            ? `/members/${member.id}/memberships/${currentMembership.id}/renew`
-                                            : latestExpiredMembership
-                                                ? `/members/${member.id}/memberships/${latestExpiredMembership.id}/renew`
-                                                : members.memberships.create(
-                                                    member.id,
-                                                )
-                                    }
-                                    className="rounded-md border px-4 py-2 text-sm font-medium"
-                                >
-                                    Renew
-                                </Link>
-                            )}
+                        {checkInError && (
+                            <Alert variant="destructive" className="mt-2">
+                                <AlertCircle className="h-4 w-4" />
+                                <AlertTitle>Check-in Failed</AlertTitle>
+                                <AlertDescription>{checkInError}</AlertDescription>
+                            </Alert>
+                        )}
 
-                        <Link
-                            href={members.edit(member.id)}
-                            className="rounded-md border px-4 py-2 text-sm font-medium"
-                        >
-                            Edit
-                        </Link>
+                        {!hasActiveMembership && (
+                            <p className="text-xs text-muted-foreground">
+                                Add an active membership to enable front-desk check-in for this member.
+                            </p>
+                        )}
+                    </CardHeader>
+                </Card>
 
-                        <button
-                            type="button"
-                            onClick={() => {
-                                if (
-                                    window.confirm(
-                                        `Archive ${member.name}? Their historical data will be preserved.`,
-                                    )
-                                ) {
-                                    router.delete(
-                                        members.destroy(
-                                            member.id,
-                                        ).url,
-                                    );
-                                }
-                            }}
-                            className="rounded-md border px-4 py-2 text-sm font-medium text-destructive"
-                        >
-                            Archive
-                        </button>
+                {/* ROW 1: Operational Core (Current Membership + Profile/Context) */}
+                <div className="grid gap-6 lg:grid-cols-2">
+                    {/* Left Column (Current Membership & Upcoming) */}
+                    <div className="flex flex-col gap-6">
+                        {/* Current Membership */}
+                        <Card className="border-border">
+                            <CardHeader className="flex flex-row items-center justify-between pb-4">
+                                <div>
+                                    <CardTitle className="text-lg font-bold">Current Membership</CardTitle>
+                                    <CardDescription>Active agreement granting gym facility access</CardDescription>
+                                </div>
+                                <Button variant="outline" size="sm" asChild className="gap-1.5">
+                                    <Link href={members.memberships.create(member.id)}>
+                                        <Plus className="h-4 w-4" />
+                                        <span>New Plan</span>
+                                    </Link>
+                                </Button>
+                            </CardHeader>
+
+                            <CardContent>
+                                {currentMembership ? (
+                                    <div className="flex flex-col gap-5 rounded-lg border bg-muted/20 p-5">
+                                        <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
+                                            <div>
+                                                <div className="flex items-center gap-2">
+                                                    <h3 className="text-xl font-bold text-foreground">
+                                                        {currentMembership.membership_plan.name}
+                                                    </h3>
+                                                    <Badge variant="outline" className="capitalize text-xs font-semibold">
+                                                        {currentMembership.lifecycle_status ?? currentMembership.status}
+                                                    </Badge>
+                                                </div>
+                                                <p className="mt-1 text-xs text-muted-foreground font-mono">
+                                                    {formatDate(currentMembership.start_date)} → {formatDate(currentMembership.end_date)}
+                                                </p>
+                                            </div>
+
+                                            <div className="text-left sm:text-right shrink-0">
+                                                <p className="text-xs text-muted-foreground uppercase font-semibold">Membership Fee</p>
+                                                <p className="text-2xl font-bold text-foreground">
+                                                    {formatCurrency(Number(currentMembership.price))}
+                                                </p>
+                                            </div>
+                                        </div>
+
+                                        <div className="grid gap-3 sm:grid-cols-3">
+                                            <div className="rounded-lg border bg-card p-3">
+                                                <p className="text-xs text-muted-foreground font-medium">Paid Amount</p>
+                                                <p className="mt-1 text-lg font-bold text-emerald-600 dark:text-emerald-400">
+                                                    {formatCurrency(currentPaid)}
+                                                </p>
+                                            </div>
+
+                                            <div className="rounded-lg border bg-card p-3">
+                                                <p className="text-xs text-muted-foreground font-medium">Balance Due</p>
+                                                <p className={`mt-1 text-lg font-bold ${currentBalance > 0 ? 'text-destructive' : 'text-foreground'}`}>
+                                                    {formatCurrency(currentBalance)}
+                                                </p>
+                                            </div>
+
+                                            <div className="rounded-lg border bg-card p-3">
+                                                <p className="text-xs text-muted-foreground font-medium">Plan Period</p>
+                                                <p className="mt-1 text-lg font-bold text-foreground">
+                                                    {getDurationDays(currentMembership)} days
+                                                </p>
+                                            </div>
+                                        </div>
+
+                                        <div className="flex flex-wrap items-center gap-2.5 pt-1">
+                                            {currentBalance > 0 && (
+                                                <Button asChild className="gap-1.5" size="sm">
+                                                    <Link
+                                                        href={members.memberships.payments.create([
+                                                            member.id,
+                                                            currentMembership.id,
+                                                        ])}
+                                                    >
+                                                        <CreditCard className="h-4 w-4" />
+                                                        Record Payment
+                                                    </Link>
+                                                </Button>
+                                            )}
+
+                                            <Button variant="outline" asChild className="gap-1.5" size="sm">
+                                                <Link href={`/members/${member.id}/memberships/${currentMembership.id}/renew`}>
+                                                    <RefreshCw className="h-4 w-4" />
+                                                    Renew Plan
+                                                </Link>
+                                            </Button>
+                                        </div>
+                                    </div>
+                                ) : (
+                                    <div className="rounded-lg border border-dashed p-8 text-center flex flex-col items-center justify-center">
+                                        <AlertCircle className="h-8 w-8 text-muted-foreground/50 mb-2" />
+                                        <p className="font-semibold text-base">No active membership</p>
+                                        <p className="mt-1 text-xs text-muted-foreground max-w-sm">
+                                            This member does not currently have an active membership. Assign a plan to grant entrance access.
+                                        </p>
+                                        <Button asChild className="mt-4 gap-1.5" size="sm">
+                                            <Link href={members.memberships.create(member.id)}>
+                                                <Plus className="h-4 w-4" />
+                                                Add Membership
+                                            </Link>
+                                        </Button>
+                                    </div>
+                                )}
+                            </CardContent>
+                        </Card>
+
+                        {/* Upcoming Membership (if exists) */}
+                        {upcomingMembership && (
+                            <Card className="border-border">
+                                <CardHeader className="pb-3">
+                                    <CardTitle className="text-base font-bold">Upcoming Membership</CardTitle>
+                                    <CardDescription>Scheduled renewal ready to activate</CardDescription>
+                                </CardHeader>
+                                <CardContent>
+                                    <div className="rounded-lg border p-4 flex flex-col gap-3">
+                                        <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
+                                            <div>
+                                                <div className="flex items-center gap-2">
+                                                    <h3 className="font-bold text-base">
+                                                        {upcomingMembership.membership_plan.name}
+                                                    </h3>
+                                                    <Badge variant="secondary" className="text-xs font-semibold">Upcoming</Badge>
+                                                </div>
+                                                <p className="mt-1 text-xs text-muted-foreground font-mono">
+                                                    {formatDate(upcomingMembership.start_date)} → {formatDate(upcomingMembership.end_date)}
+                                                </p>
+                                            </div>
+                                            <div className="text-left sm:text-right">
+                                                <p className="text-xs text-muted-foreground">Price</p>
+                                                <p className="font-bold text-lg">
+                                                    {formatCurrency(Number(upcomingMembership.price))}
+                                                </p>
+                                            </div>
+                                        </div>
+
+                                        <div className="grid gap-3 sm:grid-cols-2">
+                                            <div className="rounded-md border bg-muted/20 p-2.5">
+                                                <p className="text-xs text-muted-foreground">Paid</p>
+                                                <p className="font-semibold text-sm">{formatCurrency(upcomingPaid)}</p>
+                                            </div>
+                                            <div className="rounded-md border bg-muted/20 p-2.5">
+                                                <p className="text-xs text-muted-foreground">Outstanding</p>
+                                                <p className="font-semibold text-sm">{formatCurrency(upcomingBalance)}</p>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </CardContent>
+                            </Card>
+                        )}
+                    </div>
+
+                    {/* Right Column (Personal Details & Context/Goals) */}
+                    <div className="flex flex-col gap-6">
+                        {/* Personal Details */}
+                        <Card className="border-border">
+                            <CardHeader className="pb-3">
+                                <CardTitle className="text-base font-bold">Personal Profile</CardTitle>
+                                <CardDescription>Contact and demographic details</CardDescription>
+                            </CardHeader>
+                            <CardContent className="flex flex-col gap-3 text-sm">
+                                <div className="flex justify-between items-center gap-4 py-2 border-b border-border/50">
+                                    <span className="text-muted-foreground text-xs font-medium shrink-0">Phone Number</span>
+                                    <span className="font-semibold text-foreground text-right">{member.phone}</span>
+                                </div>
+
+                                <div className="flex justify-between items-center gap-4 py-2 border-b border-border/50">
+                                    <span className="text-muted-foreground text-xs font-medium shrink-0">Email Address</span>
+                                    <span className="font-medium text-foreground text-right min-w-0 truncate">{member.email ?? '—'}</span>
+                                </div>
+
+                                <div className="flex justify-between items-center gap-4 py-2 border-b border-border/50">
+                                    <span className="text-muted-foreground text-xs font-medium shrink-0">Date of Birth</span>
+                                    <span className="font-medium text-foreground text-right">
+                                        {member.date_of_birth ? formatDate(member.date_of_birth) : '—'}
+                                    </span>
+                                </div>
+                            </CardContent>
+                        </Card>
+
+                        {/* Context & Goals */}
+                        <Card className="border-border">
+                            <CardHeader className="flex flex-row items-start justify-between pb-3">
+                                <div>
+                                    <CardTitle className="text-base font-bold">Target Expectations</CardTitle>
+                                    <CardDescription>
+                                        Benchmark metrics used to calculate attendance adherence
+                                    </CardDescription>
+                                </div>
+                                {!editingContext && (
+                                    <Button
+                                        variant="outline"
+                                        size="sm"
+                                        onClick={handleContextEdit}
+                                        className="gap-1 h-8 text-xs"
+                                    >
+                                        <Edit3 className="h-3.5 w-3.5" />
+                                        <span>Edit</span>
+                                    </Button>
+                                )}
+                            </CardHeader>
+
+                            <CardContent>
+                                {!editingContext ? (
+                                    <div className="flex flex-col gap-3 text-sm">
+                                        <div className="flex justify-between items-center gap-4 py-2 border-b border-border/50">
+                                            <span className="text-muted-foreground text-xs font-medium shrink-0">Target Frequency</span>
+                                            <Badge variant="secondary" className="font-semibold text-xs shrink-0">
+                                                {currentExpectation
+                                                    ? `${currentExpectation.visits_per_week} visits / week`
+                                                    : 'Not set'}
+                                            </Badge>
+                                        </div>
+
+                                        <div className="flex justify-between items-center gap-4 py-2">
+                                            <span className="text-muted-foreground text-xs font-medium shrink-0">Fitness Goal</span>
+                                            <span className="font-semibold text-foreground capitalize text-xs text-right">
+                                                {currentGoal ? currentGoal.goal.replace(/_/g, ' ') : 'Not set'}
+                                            </span>
+                                        </div>
+                                    </div>
+                                ) : (
+                                    <form onSubmit={submitContext} className="flex flex-col gap-3.5">
+                                        <div className="flex flex-col gap-1.5">
+                                            <Label htmlFor="context-visits" className="text-xs">Expected visits per week</Label>
+                                            <select
+                                                id="context-visits"
+                                                value={contextForm.data.visits_per_week}
+                                                onChange={(event) =>
+                                                    contextForm.setData('visits_per_week', event.target.value)
+                                                }
+                                                disabled={contextForm.processing}
+                                                className="h-9 w-full rounded-md border border-input bg-background px-3 text-xs focus:outline-none focus:ring-2 focus:ring-ring"
+                                            >
+                                                <option value="">Not set</option>
+                                                {Array.from({ length: 7 }, (_, index) => index + 1).map((value) => (
+                                                    <option key={value} value={value}>
+                                                        {value} {value === 1 ? 'visit' : 'visits'} / week
+                                                    </option>
+                                                ))}
+                                            </select>
+                                            {contextForm.errors.visits_per_week && (
+                                                <p className="text-xs text-destructive">
+                                                    {contextForm.errors.visits_per_week}
+                                                </p>
+                                            )}
+                                        </div>
+
+                                        <div className="flex flex-col gap-1.5">
+                                            <Label htmlFor="context-goal" className="text-xs">Goal</Label>
+                                            <select
+                                                id="context-goal"
+                                                value={contextForm.data.goal}
+                                                onChange={(event) =>
+                                                    contextForm.setData('goal', event.target.value)
+                                                }
+                                                disabled={contextForm.processing}
+                                                className="h-9 w-full rounded-md border border-input bg-background px-3 text-xs focus:outline-none focus:ring-2 focus:ring-ring"
+                                            >
+                                                <option value="">Not set</option>
+                                                {contextForm.data.goal &&
+                                                    !goalOptions.some(
+                                                        (option) => option.value === contextForm.data.goal,
+                                                    ) && (
+                                                        <option value={contextForm.data.goal}>
+                                                            {contextForm.data.goal.replace(/_/g, ' ')}
+                                                        </option>
+                                                    )}
+                                                {goalOptions.map((option) => (
+                                                    <option key={option.value} value={option.value}>
+                                                        {option.label}
+                                                    </option>
+                                                ))}
+                                            </select>
+                                            {contextForm.errors.goal && (
+                                                <p className="text-xs text-destructive">
+                                                    {contextForm.errors.goal}
+                                                </p>
+                                            )}
+                                        </div>
+
+                                        <div className="flex flex-col gap-1.5">
+                                            <Label htmlFor="context-start-date" className="text-xs">Effective from</Label>
+                                            <Input
+                                                id="context-start-date"
+                                                type="date"
+                                                value={contextForm.data.start_date}
+                                                onChange={(event) =>
+                                                    contextForm.setData('start_date', event.target.value)
+                                                }
+                                                disabled={contextForm.processing}
+                                                className="h-9 text-xs"
+                                            />
+                                            {contextForm.errors.start_date && (
+                                                <p className="text-xs text-destructive">
+                                                    {contextForm.errors.start_date}
+                                                </p>
+                                            )}
+                                        </div>
+
+                                        {contextErrors.context && (
+                                            <p className="text-xs text-destructive">
+                                                {contextErrors.context}
+                                            </p>
+                                        )}
+
+                                        <p className="text-[11px] text-muted-foreground">
+                                            Saving updates current expectation and records history.
+                                        </p>
+
+                                        <div className="flex items-center gap-2 pt-1">
+                                            <Button
+                                                type="submit"
+                                                disabled={contextForm.processing}
+                                                size="sm"
+                                                className="h-8 text-xs"
+                                            >
+                                                {contextForm.processing ? 'Saving...' : 'Save Context'}
+                                            </Button>
+
+                                            <Button
+                                                type="button"
+                                                variant="outline"
+                                                size="sm"
+                                                disabled={contextForm.processing}
+                                                onClick={() => setEditingContext(false)}
+                                                className="h-8 text-xs"
+                                            >
+                                                Cancel
+                                            </Button>
+                                        </div>
+                                    </form>
+                                )}
+                            </CardContent>
+                        </Card>
                     </div>
                 </div>
 
-                <div className="grid gap-6 md:grid-cols-2">
-                    {/* Overview */}
-                    <section className="rounded-lg border p-5">
-                        <h2 className="text-lg font-semibold">
-                            Overview
-                        </h2>
-
-                        <div className="mt-4 space-y-3 text-sm">
-                            <div className="flex justify-between gap-4">
-                                <span className="text-muted-foreground">
-                                    Phone
-                                </span>
-
-                                <span>{member.phone}</span>
-                            </div>
-
-                            <div className="flex justify-between gap-4">
-                                <span className="text-muted-foreground">
-                                    Email
-                                </span>
-
-                                <span>
-                                    {member.email ?? '—'}
-                                </span>
-                            </div>
-
-                            <div className="flex justify-between gap-4">
-                                <span className="text-muted-foreground">
-                                    Date of birth
-                                </span>
-
-                                <span>
-                                    {member.date_of_birth
-                                        ? formatDate(
-                                            member.date_of_birth,
-                                        )
-                                        : '—'}
-                                </span>
-                            </div>
-                        </div>
-                    </section>
-
-                    {/* Context */}
-                    <section className="rounded-lg border p-5">
-                        <div className="flex items-start justify-between gap-4">
-                            <div>
-                                <h2 className="text-lg font-semibold">
-                                    Context
-                                </h2>
-
-                                <p className="mt-1 text-sm text-muted-foreground">
-                                    The expectations and goals used to understand this member's activity.
-                                </p>
-                            </div>
-
-                            {!editingContext && (
-                                <button
-                                    type="button"
-                                    onClick={handleContextEdit}
-                                    className="rounded-md border px-3 py-1.5 text-sm font-medium hover:bg-muted"
-                                >
-                                    Edit
-                                </button>
-                            )}
-                        </div>
-
-                        {!editingContext ? (
-                            <div className="mt-4 space-y-4 text-sm">
+                {/* ROW 2: Engagement & Activity Calendar */}
+                <div className="grid gap-6 lg:grid-cols-5">
+                    {/* Attendance Calendar (wider, 3/5 cols) */}
+                    <div className="lg:col-span-3 order-2 lg:order-1 flex flex-col gap-6">
+                        <Card className="border-border h-full">
+                            <CardHeader className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between pb-3">
                                 <div>
-                                    <p className="text-muted-foreground">
-                                        Expected visits
-                                    </p>
-
-                                    <p className="mt-1 font-medium">
-                                        {currentExpectation
-                                            ? `${currentExpectation.visits_per_week} / week`
-                                            : 'Not set'}
-                                    </p>
+                                    <CardTitle className="text-base font-bold">Attendance Calendar</CardTitle>
+                                    <CardDescription>Daily check-in history and activity</CardDescription>
                                 </div>
 
-                                <div>
-                                    <p className="text-muted-foreground">
-                                        Current goal
-                                    </p>
-
-                                    <p className="mt-1 font-medium capitalize">
-                                        {currentGoal
-                                            ? currentGoal.goal.replace(/_/g, ' ')
-                                            : 'Not set'}
-                                    </p>
-                                </div>
-                            </div>
-                        ) : (
-                            <form
-                                onSubmit={submitContext}
-                                className="mt-4 space-y-4"
-                            >
-                                <div>
-                                    <label
-                                        htmlFor="context-visits"
-                                        className="mb-1.5 block text-sm font-medium"
-                                    >
-                                        Expected visits per week
-                                    </label>
-
-                                    <select
-                                        id="context-visits"
-                                        value={contextForm.data.visits_per_week}
-                                        onChange={(event) =>
-                                            contextForm.setData(
-                                                'visits_per_week',
-                                                event.target.value,
-                                            )
-                                        }
-                                        disabled={contextForm.processing}
-                                        className="h-10 w-full rounded-md border bg-background px-3 text-sm"
-                                    >
-                                        <option value="">Not set</option>
-                                        {Array.from({ length: 7 }, (_, index) => index + 1).map(
-                                            (value) => (
-                                                <option key={value} value={value}>
-                                                    {value} {value === 1 ? 'visit' : 'visits'} / week
-                                                </option>
-                                            ),
-                                        )}
-                                    </select>
-
-                                    {contextForm.errors.visits_per_week && (
-                                        <p className="mt-1 text-sm text-destructive">
-                                            {contextForm.errors.visits_per_week}
-                                        </p>
-                                    )}
-                                </div>
-
-                                <div>
-                                    <label
-                                        htmlFor="context-goal"
-                                        className="mb-1.5 block text-sm font-medium"
-                                    >
-                                        Goal
-                                    </label>
-
-                                    <select
-                                        id="context-goal"
-                                        value={contextForm.data.goal}
-                                        onChange={(event) =>
-                                            contextForm.setData(
-                                                'goal',
-                                                event.target.value,
-                                            )
-                                        }
-                                        disabled={contextForm.processing}
-                                        className="h-10 w-full rounded-md border bg-background px-3 text-sm"
-                                    >
-                                        <option value="">Not set</option>
-                                        {contextForm.data.goal &&
-                                            !goalOptions.some(
-                                                (option) => option.value === contextForm.data.goal,
-                                            ) && (
-                                                <option value={contextForm.data.goal}>
-                                                    {contextForm.data.goal.replace(/_/g, ' ')}
-                                                </option>
-                                            )}
-                                        {goalOptions.map((option) => (
-                                            <option key={option.value} value={option.value}>
-                                                {option.label}
-                                            </option>
-                                        ))}
-                                    </select>
-
-                                    {contextForm.errors.goal && (
-                                        <p className="mt-1 text-sm text-destructive">
-                                            {contextForm.errors.goal}
-                                        </p>
-                                    )}
-                                </div>
-
-                                <div>
-                                    <label
-                                        htmlFor="context-start-date"
-                                        className="mb-1.5 block text-sm font-medium"
-                                    >
-                                        Effective from
-                                    </label>
-
-                                    <input
-                                        id="context-start-date"
-                                        type="date"
-                                        value={contextForm.data.start_date}
-                                        onChange={(event) =>
-                                            contextForm.setData(
-                                                'start_date',
-                                                event.target.value,
-                                            )
-                                        }
-                                        disabled={contextForm.processing}
-                                        className="h-10 w-full rounded-md border bg-background px-3 text-sm"
-                                    />
-
-                                    {contextForm.errors.start_date && (
-                                        <p className="mt-1 text-sm text-destructive">
-                                            {contextForm.errors.start_date}
-                                        </p>
-                                    )}
-                                </div>
-
-                                {contextForm.errors.context && (
-                                    <p className="text-sm text-destructive">
-                                        {contextForm.errors.context}
-                                    </p>
-                                )}
-
-                                <p className="text-xs text-muted-foreground">
-                                    Saving creates a new context period and preserves the previous history.
-                                </p>
-
-                                <div className="flex flex-wrap gap-2">
-                                    <button
-                                        type="submit"
-                                        disabled={contextForm.processing}
-                                        className="rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground disabled:cursor-not-allowed disabled:opacity-50"
-                                    >
-                                        {contextForm.processing ? 'Saving...' : 'Save Context'}
-                                    </button>
-
-                                    <button
+                                <div className="flex items-center gap-1.5">
+                                    <Button
+                                        variant="outline"
+                                        size="icon"
                                         type="button"
-                                        disabled={contextForm.processing}
-                                        onClick={() => setEditingContext(false)}
-                                        className="rounded-md border px-4 py-2 text-sm font-medium"
-                                    >
-                                        Cancel
-                                    </button>
-                                </div>
-                            </form>
-                        )}
-                    </section>
-
-                    {/* Context History */}
-                    <section className="rounded-lg border p-5 md:col-span-2">
-                        <div>
-                            <h2 className="text-lg font-semibold">
-                                Context History
-                            </h2>
-                            <p className="mt-1 text-sm text-muted-foreground">
-                                Previous expectations and goals are preserved so attendance changes can be interpreted against the right context.
-                            </p>
-                        </div>
-
-                        <div className="mt-5 grid gap-4 md:grid-cols-2">
-                            <div className="rounded-lg border">
-                                <div className="border-b px-4 py-3">
-                                    <h3 className="text-sm font-semibold">
-                                        Attendance Expectations
-                                    </h3>
-                                </div>
-
-                                <div className="divide-y">
-                                    {member.expectations.length === 0 ? (
-                                        <p className="px-4 py-4 text-sm text-muted-foreground">
-                                            No expectation history recorded.
-                                        </p>
-                                    ) : (
-                                        [...member.expectations]
-                                            .sort((a, b) =>
-                                                b.start_date.localeCompare(a.start_date),
-                                            )
-                                            .map((expectation) => (
-                                                <div key={expectation.id} className="px-4 py-4">
-                                                    <div className="flex items-start justify-between gap-3">
-                                                        <p className="font-medium">
-                                                            {expectation.visits_per_week}{' '}
-                                                            {expectation.visits_per_week === 1 ? 'visit' : 'visits'} / week
-                                                        </p>
-                                                        <span
-                                                            className={`rounded-full border px-2 py-0.5 text-[11px] font-medium ${expectation.end_date === null
-                                                                ? 'border-primary/30 text-primary'
-                                                                : 'border-muted-foreground/30 text-muted-foreground'
-                                                                }`}
-                                                        >
-                                                            {expectation.end_date === null ? 'Current' : 'Past'}
-                                                        </span>
-                                                    </div>
-                                                    <p className="mt-1 text-xs text-muted-foreground">
-                                                        {formatDate(expectation.start_date)}
-                                                        {' → '}
-                                                        {expectation.end_date
-                                                            ? formatDate(expectation.end_date)
-                                                            : 'Present'}
-                                                    </p>
-                                                </div>
-                                            ))
-                                    )}
-                                </div>
-                            </div>
-
-                            <div className="rounded-lg border">
-                                <div className="border-b px-4 py-3">
-                                    <h3 className="text-sm font-semibold">
-                                        Goal History
-                                    </h3>
-                                </div>
-
-                                <div className="divide-y">
-                                    {member.goals.length === 0 ? (
-                                        <p className="px-4 py-4 text-sm text-muted-foreground">
-                                            No goal history recorded.
-                                        </p>
-                                    ) : (
-                                        [...member.goals]
-                                            .sort((a, b) =>
-                                                b.start_date.localeCompare(a.start_date),
-                                            )
-                                            .map((goal) => (
-                                                <div key={goal.id} className="px-4 py-4">
-                                                    <div className="flex items-start justify-between gap-3">
-                                                        <p className="font-medium capitalize">
-                                                            {goal.goal.replace(/_/g, ' ')}
-                                                        </p>
-                                                        <span
-                                                            className={`rounded-full border px-2 py-0.5 text-[11px] font-medium ${goal.end_date === null
-                                                                ? 'border-primary/30 text-primary'
-                                                                : 'border-muted-foreground/30 text-muted-foreground'
-                                                                }`}
-                                                        >
-                                                            {goal.end_date === null ? 'Current' : 'Past'}
-                                                        </span>
-                                                    </div>
-                                                    <p className="mt-1 text-xs text-muted-foreground">
-                                                        {formatDate(goal.start_date)}
-                                                        {' → '}
-                                                        {goal.end_date
-                                                            ? formatDate(goal.end_date)
-                                                            : 'Present'}
-                                                    </p>
-                                                </div>
-                                            ))
-                                    )}
-                                </div>
-                            </div>
-                        </div>
-                    </section>
-
-                    {/* Engagement Snapshot */}
-                    <section className="rounded-lg border p-5 md:col-span-2">
-                        <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
-                            <div>
-                                <h2 className="text-lg font-semibold">
-                                    Engagement Snapshot
-                                </h2>
-                                <p className="mt-1 text-sm text-muted-foreground">
-                                    Recent attendance context to support retention decisions.
-                                </p>
-                            </div>
-                            <p className={`text-sm font-medium ${attendanceTrend.className}`}>
-                                {attendanceTrend.label}
-                            </p>
-                        </div>
-
-                        <div className="mt-5 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
-                            <div className="rounded-lg border bg-muted/20 p-4">
-                                <p className="text-xs text-muted-foreground">
-                                    Last 14 days
-                                </p>
-                                <p className="mt-1 text-xl font-semibold">
-                                    {attendanceSnapshot.recentVisits} visits
-                                </p>
-                            </div>
-
-                            <div className="rounded-lg border bg-muted/20 p-4">
-                                <p className="text-xs text-muted-foreground">
-                                    Previous 14 days
-                                </p>
-                                <p className="mt-1 text-xl font-semibold">
-                                    {attendanceSnapshot.previousVisits} visits
-                                </p>
-                            </div>
-
-                            <div className="rounded-lg border bg-muted/20 p-4">
-                                <p className="text-xs text-muted-foreground">
-                                    Expected (14 days)
-                                </p>
-                                <p className="mt-1 text-xl font-semibold">
-                                    {attendanceSnapshot.expectedVisitsInWindow === null
-                                        ? 'Not set'
-                                        : `${attendanceSnapshot.expectedVisitsInWindow} visits`}
-                                </p>
-                                {attendanceSnapshot.expectedVisitsPerWeek !== null && (
-                                    <p className="mt-1 text-xs text-muted-foreground">
-                                        {attendanceSnapshot.expectedVisitsPerWeek} / week
-                                    </p>
-                                )}
-                            </div>
-
-                            <div className="rounded-lg border bg-muted/20 p-4">
-                                <p className="text-xs text-muted-foreground">
-                                    Last visit
-                                </p>
-                                <p className="mt-1 text-sm font-semibold">
-                                    {attendanceSnapshot.lastVisit
-                                        ? formatDateTime(attendanceSnapshot.lastVisit)
-                                        : 'No visits recorded'}
-                                </p>
-                            </div>
-                        </div>
-
-                        {attendanceSnapshot.adherencePercentage !== null && (
-                            <div className="mt-4 rounded-lg border bg-muted/20 p-4">
-                                <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
-                                    <div>
-                                        <p className="text-sm font-medium">
-                                            Attendance vs expectation
-                                        </p>
-                                        <p className="mt-1 text-xs text-muted-foreground">
-                                            Comparing the last 14 days with the member's current expected frequency.
-                                        </p>
-                                    </div>
-                                    <div className="text-left sm:text-right">
-                                        <p className="text-lg font-semibold">
-                                            {attendanceSnapshot.adherencePercentage}%
-                                        </p>
-                                        <p className="text-xs text-muted-foreground">
-                                            {attendanceSnapshot.recentVisits} of {attendanceSnapshot.expectedVisitsInWindow} visits
-                                        </p>
-                                    </div>
-                                </div>
-                            </div>
-                        )}
-
-                        {attendanceSnapshot.visitGap !== null && attendanceSnapshot.visitGap < 0 && (
-                            <div className="mt-3 rounded-lg border border-amber-500/30 bg-amber-500/5 p-4">
-                                <p className="text-sm font-medium text-amber-700 dark:text-amber-300">
-                                    {Math.abs(attendanceSnapshot.visitGap)} fewer visits than expected in the last 14 days.
-                                </p>
-                                <p className="mt-1 text-xs text-muted-foreground">
-                                    This is an attendance gap, not a diagnosis of disengagement. Review the member's context and any open signals before intervening.
-                                </p>
-                            </div>
-                        )}
-
-                        {openSignals.some(
-                            (signal) => signal.type === 'attendance_decline',
-                        ) && (
-                                <div className="mt-4 rounded-lg border border-destructive/30 bg-destructive/5 p-4">
-                                    <p className="text-sm font-medium text-destructive">
-                                        Attendance decline signal is currently open.
-                                    </p>
-                                    <p className="mt-1 text-xs text-muted-foreground">
-                                        Review the signal evidence and previous interventions before deciding the next action.
-                                    </p>
-                                </div>
-                            )}
-                    </section>
-
-                    {/* Activity */}
-                    <section className="rounded-lg border p-5 md:col-span-2">
-                        <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
-                            <div>
-                                <h2 className="text-lg font-semibold">
-                                    Activity
-                                </h2>
-
-                                <p className="mt-1 text-sm text-muted-foreground">
-                                    Attendance and member activity in one place.
-                                </p>
-                            </div>
-
-                            <div className="flex items-center gap-2">
-                                <button
-                                    type="button"
-                                    onClick={() =>
-                                        setCalendarMonth(
-                                            new Date(
-                                                calendarMonth.getFullYear(),
-                                                calendarMonth.getMonth() - 1,
-                                                1,
-                                            ),
-                                        )
-                                    }
-                                    className="inline-flex h-9 w-9 items-center justify-center rounded-md border text-sm hover:bg-muted"
-                                    aria-label="Previous month"
-                                >
-                                    ←
-                                </button>
-
-                                <div className="min-w-36 text-center text-sm font-medium">
-                                    {getCalendarMonthLabel(
-                                        calendarMonth,
-                                    )}
-                                </div>
-
-                                <button
-                                    type="button"
-                                    onClick={() =>
-                                        setCalendarMonth(
-                                            new Date(
-                                                calendarMonth.getFullYear(),
-                                                calendarMonth.getMonth() + 1,
-                                                1,
-                                            ),
-                                        )
-                                    }
-                                    className="inline-flex h-9 w-9 items-center justify-center rounded-md border text-sm hover:bg-muted"
-                                    aria-label="Next month"
-                                >
-                                    →
-                                </button>
-                            </div>
-                        </div>
-
-                        <div className="mt-5 overflow-hidden rounded-lg border">
-                            <div className="grid grid-cols-7 border-b bg-muted/30">
-                                {[
-                                    'Mon',
-                                    'Tue',
-                                    'Wed',
-                                    'Thu',
-                                    'Fri',
-                                    'Sat',
-                                    'Sun',
-                                ].map((day) => (
-                                    <div
-                                        key={day}
-                                        className="px-1 py-2 text-center text-xs font-medium text-muted-foreground"
-                                    >
-                                        {day}
-                                    </div>
-                                ))}
-                            </div>
-
-                            <div className="grid grid-cols-7">
-                                {calendarDays.map((day) => {
-                                    const dateKey =
-                                        getCalendarDateKey(day);
-
-                                    const dayEvents =
-                                        timelineByDate.get(dateKey) ?? [];
-
-                                    const attendanceCount =
-                                        dayEvents.filter(
-                                            (event) =>
-                                                event.type ===
-                                                'attendance_recorded',
-                                        ).length;
-
-                                    const hasActivity =
-                                        dayEvents.length > 0;
-
-                                    const isCurrentMonth =
-                                        day.getMonth() ===
-                                        calendarMonth.getMonth() &&
-                                        day.getFullYear() ===
-                                        calendarMonth.getFullYear();
-
-                                    const isSelected =
-                                        selectedActivityDate ===
-                                        dateKey;
-
-                                    const todayKey =
-                                        getIndiaDateKey(
-                                            new Date().toISOString(),
-                                        );
-
-                                    const isToday =
-                                        dateKey === todayKey;
-
-                                    return (
-                                        <button
-                                            key={dateKey}
-                                            type="button"
-                                            onClick={() =>
-                                                setSelectedActivityDate(
-                                                    dateKey,
-                                                )
-                                            }
-                                            className={`relative min-h-14 border-b border-r p-1 text-left transition sm:min-h-16 sm:p-2 ${isCurrentMonth
-                                                ? 'bg-background'
-                                                : 'bg-muted/10 text-muted-foreground'
-                                                } ${isSelected
-                                                    ? 'ring-2 ring-inset ring-primary'
-                                                    : 'hover:bg-muted/40'
-                                                }`}
-                                        >
-                                            <div className="flex items-start justify-between gap-1">
-                                                <span
-                                                    className={`flex h-6 w-6 items-center justify-center rounded-full text-xs font-medium ${isToday
-                                                        ? 'bg-primary text-primary-foreground'
-                                                        : ''
-                                                        }`}
-                                                >
-                                                    {day.getDate()}
-                                                </span>
-
-                                                {attendanceCount > 0 && (
-                                                    <span className="rounded-full bg-muted px-1.5 py-0.5 text-[10px] font-medium">
-                                                        {attendanceCount}
-                                                    </span>
-                                                )}
-                                            </div>
-
-                                            {hasActivity && (
-                                                <div className="mt-2 flex items-center gap-1">
-                                                    <span className="h-1.5 w-1.5 rounded-full bg-foreground" />
-
-                                                    {dayEvents.length > 1 && (
-                                                        <span className="text-[10px] text-muted-foreground">
-                                                            {dayEvents.length} events
-                                                        </span>
-                                                    )}
-                                                </div>
-                                            )}
-                                        </button>
-                                    );
-                                })}
-                            </div>
-                        </div>
-
-                        <div className="mt-5">
-                            <div className="flex items-center justify-between gap-4">
-                                <div>
-                                    <p className="text-sm font-medium">
-                                        {getSelectedDayLabel(
-                                            selectedActivityDate,
-                                        )}
-                                    </p>
-
-                                    <p className="mt-1 text-xs text-muted-foreground">
-                                        {selectedActivityEvents.length === 0
-                                            ? 'No activity recorded'
-                                            : `${selectedActivityEvents.length} ${selectedActivityEvents.length === 1 ? 'event' : 'events'}`}
-                                    </p>
-                                </div>
-
-                                <button
-                                    type="button"
-                                    onClick={() => {
-                                        const todayKey =
-                                            getIndiaDateKey(
-                                                new Date().toISOString(),
-                                            );
-
-                                        const today =
-                                            parseDateOnly(todayKey);
-
-                                        setCalendarMonth(
-                                            new Date(
-                                                today.getFullYear(),
-                                                today.getMonth(),
-                                                1,
-                                            ),
-                                        );
-
-                                        setSelectedActivityDate(
-                                            todayKey,
-                                        );
-                                    }}
-                                    className="rounded-md border px-3 py-1.5 text-xs font-medium hover:bg-muted"
-                                >
-                                    Today
-                                </button>
-                            </div>
-
-                            {selectedActivityEvents.length === 0 ? (
-                                <div className="mt-3 rounded-lg border border-dashed p-5 text-center">
-                                    <p className="text-sm text-muted-foreground">
-                                        No activity recorded for this day.
-                                    </p>
-                                </div>
-                            ) : (
-                                <div className="mt-3 space-y-3">
-                                    {selectedActivityEvents.map(
-                                        (event) => (
-                                            <TimelineEvent
-                                                key={event.id}
-                                                event={event}
-                                                compact
-                                            />
-                                        ),
-                                    )}
-                                </div>
-                            )}
-                        </div>
-
-                        <p className="mt-4 text-xs text-muted-foreground">
-                            Calendar shows activity from the loaded member history.
-                        </p>
-                    </section>
-
-                    {/* Current Membership */}
-                    <section className="rounded-lg border p-5 md:col-span-2">
-                        <div className="flex items-start justify-between gap-4">
-                            <div>
-                                <h2 className="text-lg font-semibold">
-                                    Current Membership
-                                </h2>
-
-                                <p className="mt-1 text-sm text-muted-foreground">
-                                    The membership currently granting
-                                    access.
-                                </p>
-                            </div>
-
-                            <Link
-                                href={members.memberships.create(
-                                    member.id,
-                                )}
-                                className="rounded-md border px-4 py-2 text-sm font-medium"
-                            >
-                                Add Membership
-                            </Link>
-                        </div>
-
-                        {currentMembership ? (
-                            <div className="mt-5 rounded-lg border bg-muted/20 p-5">
-                                <div className="flex flex-col gap-5 lg:flex-row lg:items-start lg:justify-between">
-                                    <div>
-                                        <div className="flex flex-wrap items-center gap-2">
-                                            <h3 className="text-xl font-semibold">
-                                                {
-                                                    currentMembership
-                                                        .membership_plan
-                                                        .name
-                                                }
-                                            </h3>
-
-                                            <span className="rounded-full border px-2.5 py-1 text-xs font-medium capitalize">
-                                                {currentMembership.lifecycle_status ??
-                                                    currentMembership.status}
-                                            </span>
-                                        </div>
-
-                                        <p className="mt-2 text-sm text-muted-foreground">
-                                            {
-                                                currentMembership.start_date
-                                            }{' '}
-                                            →{' '}
-                                            {
-                                                currentMembership.end_date
-                                            }
-                                        </p>
-                                    </div>
-
-                                    <div className="text-left lg:text-right">
-                                        <p className="text-sm text-muted-foreground">
-                                            Membership price
-                                        </p>
-
-                                        <p className="mt-1 text-2xl font-semibold">
-                                            {formatCurrency(
-                                                Number(
-                                                    currentMembership.price,
+                                        onClick={() =>
+                                            setCalendarMonth(
+                                                new Date(
+                                                    calendarMonth.getFullYear(),
+                                                    calendarMonth.getMonth() - 1,
+                                                    1,
                                                 ),
-                                            )}
-                                        </p>
-                                    </div>
-                                </div>
-
-                                <div className="mt-6 grid gap-4 sm:grid-cols-3">
-                                    <div className="rounded-md border p-4">
-                                        <p className="text-sm text-muted-foreground">
-                                            Paid
-                                        </p>
-
-                                        <p className="mt-1 text-lg font-semibold">
-                                            {formatCurrency(
-                                                currentPaid,
-                                            )}
-                                        </p>
-                                    </div>
-
-                                    <div className="rounded-md border p-4">
-                                        <p className="text-sm text-muted-foreground">
-                                            Outstanding
-                                        </p>
-
-                                        <p
-                                            className={`mt-1 text-lg font-semibold ${currentBalance >
-                                                0
-                                                ? 'text-destructive'
-                                                : ''
-                                                }`}
-                                        >
-                                            {formatCurrency(
-                                                currentBalance,
-                                            )}
-                                        </p>
-                                    </div>
-
-                                    <div className="rounded-md border p-4">
-                                        <p className="text-sm text-muted-foreground">
-                                            Plan duration
-                                        </p>
-
-                                        <p className="mt-1 text-lg font-semibold">
-                                            {getDurationDays(
-                                                currentMembership,
-                                            )}{' '}
-                                            days
-                                        </p>
-                                    </div>
-                                </div>
-
-                                <div className="mt-6 flex flex-wrap gap-3">
-                                    {currentBalance > 0 && (
-                                        <Link
-                                            href={
-                                                members
-                                                    .memberships
-                                                    .payments
-                                                    .create([
-                                                        member.id,
-                                                        currentMembership.id,
-                                                    ])
-                                            }
-                                            className="rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground"
-                                        >
-                                            Record Payment
-                                        </Link>
-                                    )}
-
-                                    <Link
-                                        href={`/members/${member.id}/memberships/${currentMembership.id}/renew`}
-                                        className="rounded-md border px-4 py-2 text-sm font-medium"
+                                            )
+                                        }
+                                        className="h-8 w-8"
+                                        aria-label="Previous month"
                                     >
-                                        Renew
-                                    </Link>
-                                </div>
-                            </div>
-                        ) : (
-                            <div className="mt-5 rounded-lg border border-dashed px-6 py-10 text-center">
-                                <p className="font-medium">
-                                    No current membership
-                                </p>
+                                        <ChevronLeft className="h-4 w-4" />
+                                    </Button>
 
-                                <p className="mt-1 text-sm text-muted-foreground">
-                                    This member does not currently have an
-                                    active membership.
-                                </p>
+                                    <span className="min-w-32 text-center text-xs font-bold">
+                                        {getCalendarMonthLabel(calendarMonth)}
+                                    </span>
 
-                                <Link
-                                    href={members.memberships.create(
-                                        member.id,
-                                    )}
-                                    className="mt-4 inline-flex rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground"
-                                >
-                                    Add Membership
-                                </Link>
-                            </div>
-                        )}
-                    </section>
-
-                    {/* Upcoming Membership */}
-                    {upcomingMembership && (
-                        <section className="rounded-lg border p-5 md:col-span-2">
-                            <div>
-                                <h2 className="text-lg font-semibold">
-                                    Upcoming Membership
-                                </h2>
-
-                                <p className="mt-1 text-sm text-muted-foreground">
-                                    The next membership scheduled for this
-                                    member.
-                                </p>
-                            </div>
-
-                            <div className="mt-5 rounded-lg border p-5">
-                                <div className="flex flex-col gap-5 sm:flex-row sm:items-start sm:justify-between">
-                                    <div>
-                                        <div className="flex flex-wrap items-center gap-2">
-                                            <h3 className="font-semibold">
-                                                {
-                                                    upcomingMembership
-                                                        .membership_plan
-                                                        .name
-                                                }
-                                            </h3>
-
-                                            <span className="rounded-full border px-2.5 py-1 text-xs font-medium">
-                                                upcoming
-                                            </span>
-                                        </div>
-
-                                        <p className="mt-2 text-sm text-muted-foreground">
-                                            {
-                                                upcomingMembership.start_date
-                                            }{' '}
-                                            →{' '}
-                                            {
-                                                upcomingMembership.end_date
-                                            }
-                                        </p>
-                                    </div>
-
-                                    <div>
-                                        <p className="text-sm text-muted-foreground">
-                                            Price
-                                        </p>
-
-                                        <p className="mt-1 font-semibold">
-                                            {formatCurrency(
-                                                Number(
-                                                    upcomingMembership.price,
+                                    <Button
+                                        variant="outline"
+                                        size="icon"
+                                        type="button"
+                                        onClick={() =>
+                                            setCalendarMonth(
+                                                new Date(
+                                                    calendarMonth.getFullYear(),
+                                                    calendarMonth.getMonth() + 1,
+                                                    1,
                                                 ),
-                                            )}
-                                        </p>
-                                    </div>
+                                            )
+                                        }
+                                        className="h-8 w-8"
+                                        aria-label="Next month"
+                                    >
+                                        <ChevronRight className="h-4 w-4" />
+                                    </Button>
                                 </div>
+                            </CardHeader>
 
-                                <div className="mt-5 grid gap-4 sm:grid-cols-2">
-                                    <div>
-                                        <p className="text-sm text-muted-foreground">
-                                            Paid
-                                        </p>
-
-                                        <p className="mt-1 font-medium">
-                                            {formatCurrency(
-                                                upcomingPaid,
-                                            )}
-                                        </p>
-                                    </div>
-
-                                    <div>
-                                        <p className="text-sm text-muted-foreground">
-                                            Outstanding
-                                        </p>
-
-                                        <p className="mt-1 font-medium">
-                                            {formatCurrency(
-                                                upcomingBalance,
-                                            )}
-                                        </p>
-                                    </div>
-                                </div>
-                            </div>
-                        </section>
-                    )}
-
-                    {/* Membership History */}
-                    <section className="rounded-lg border p-5 md:col-span-2">
-                        <div>
-                            <h2 className="text-lg font-semibold">
-                                Membership History
-                            </h2>
-
-                            <p className="mt-1 text-sm text-muted-foreground">
-                                Previous memberships and their payment
-                                history.
-                            </p>
-                        </div>
-
-                        <div className="mt-4 overflow-x-auto">
-                            <table className="w-full text-sm">
-                                <thead className="border-b">
-                                    <tr>
-                                        <th className="px-3 py-2 text-left">
-                                            Plan
-                                        </th>
-
-                                        <th className="px-3 py-2 text-left">
-                                            Start
-                                        </th>
-
-                                        <th className="px-3 py-2 text-left">
-                                            End
-                                        </th>
-
-                                        <th className="px-3 py-2 text-left">
-                                            Price
-                                        </th>
-
-                                        <th className="px-3 py-2 text-left">
-                                            Paid
-                                        </th>
-
-                                        <th className="px-3 py-2 text-left">
-                                            Balance
-                                        </th>
-
-                                        <th className="px-3 py-2 text-left">
-                                            Status
-                                        </th>
-
-                                        <th className="px-3 py-2 text-right">
-                                            Action
-                                        </th>
-                                    </tr>
-                                </thead>
-
-                                <tbody>
-                                    {historicalMemberships.length ===
-                                        0 ? (
-                                        <tr>
-                                            <td
-                                                colSpan={8}
-                                                className="px-3 py-6 text-center text-muted-foreground"
+                                <div className="overflow-hidden rounded-lg border border-border">
+                                    <div className="grid grid-cols-7 border-b bg-muted/40">
+                                        {['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'].map((day) => (
+                                            <div
+                                                key={day}
+                                                className="py-1.5 text-center text-[10px] font-bold text-muted-foreground uppercase"
                                             >
-                                                No historical
-                                                memberships.
-                                            </td>
-                                        </tr>
-                                    ) : (
-                                        historicalMemberships.map(
-                                            (
-                                                membership,
-                                            ) => {
-                                                const lifecycleStatus =
-                                                    membership.lifecycle_status ??
-                                                    membership.status;
+                                                {day}
+                                            </div>
+                                        ))}
+                                    </div>
 
-                                                const canRenew =
-                                                    lifecycleStatus ===
-                                                    'expired';
+                                    <div className="grid grid-cols-7">
+                                        {calendarDays.map((day) => {
+                                            const dateKey = getCalendarDateKey(day);
+                                            const dayEvents = timelineByDate.get(dateKey) ?? [];
+                                            const attendanceCount = dayEvents.filter(
+                                                (event) => event.type === 'attendance_recorded',
+                                            ).length;
+                                            const hasActivity = dayEvents.length > 0;
+                                            const isCurrentMonth =
+                                                day.getMonth() === calendarMonth.getMonth() &&
+                                                day.getFullYear() === calendarMonth.getFullYear();
+                                            const isSelected = selectedActivityDate === dateKey;
+                                            const todayKeyLocal = getIndiaDateKey(new Date().toISOString());
+                                            const isToday = dateKey === todayKeyLocal;
 
-                                                return (
-                                                    <tr
-                                                        key={
-                                                            membership.id
-                                                        }
-                                                        className="border-b last:border-0"
-                                                    >
-                                                        <td className="px-3 py-3">
-                                                            {
-                                                                membership
-                                                                    .membership_plan
-                                                                    .name
-                                                            }
-                                                        </td>
+                                            return (
+                                                <button
+                                                    key={dateKey}
+                                                    type="button"
+                                                    onClick={() => setSelectedActivityDate(dateKey)}
+                                                    className={`relative min-h-12 border-b border-r p-1 text-left transition sm:min-h-14 ${
+                                                        isCurrentMonth ? 'bg-background' : 'bg-muted/15 text-muted-foreground'
+                                                    } ${
+                                                        isSelected
+                                                            ? 'ring-2 ring-inset ring-primary z-10'
+                                                            : 'hover:bg-muted/40'
+                                                    }`}
+                                                >
+                                                    <div className="flex items-start justify-between gap-0.5">
+                                                        <span
+                                                            className={`flex h-5 w-5 items-center justify-center rounded-full text-[11px] font-semibold ${
+                                                                isToday ? 'bg-primary text-primary-foreground font-bold' : ''
+                                                            }`}
+                                                        >
+                                                            {day.getDate()}
+                                                        </span>
 
-                                                        <td className="px-3 py-3">
-                                                            {formatDate(
-                                                                membership.start_date,
-                                                            )}
-                                                        </td>
-
-                                                        <td className="px-3 py-3">
-                                                            {formatDate(
-                                                                membership.end_date,
-                                                            )}
-                                                        </td>
-
-                                                        <td className="px-3 py-3">
-                                                            {formatCurrency(
-                                                                Number(
-                                                                    membership.price,
-                                                                ),
-                                                            )}
-                                                        </td>
-
-                                                        <td className="px-3 py-3">
-                                                            {formatCurrency(
-                                                                membership.amount_paid,
-                                                            )}
-                                                        </td>
-
-                                                        <td className="px-3 py-3">
-                                                            <span
-                                                                className={
-                                                                    membership.balance_due >
-                                                                        0
-                                                                        ? 'font-medium text-destructive'
-                                                                        : 'font-medium'
-                                                                }
-                                                            >
-                                                                {formatCurrency(
-                                                                    membership.balance_due,
-                                                                )}
+                                                        {attendanceCount > 0 && (
+                                                            <span className="rounded-full bg-emerald-500/15 text-emerald-600 dark:text-emerald-400 px-1 py-0.2 text-[9px] font-bold">
+                                                                {attendanceCount}
                                                             </span>
-                                                        </td>
+                                                        )}
+                                                    </div>
 
-                                                        <td className="px-3 py-3">
-                                                            <span className="rounded-full border px-2.5 py-1 text-xs font-medium capitalize">
-                                                                {
-                                                                    lifecycleStatus
-                                                                }
-                                                            </span>
-                                                        </td>
-
-                                                        <td className="px-3 py-3 text-right">
-                                                            {canRenew ? (
-                                                                <Link
-                                                                    href={`/members/${member.id}/memberships/${membership.id}/renew`}
-                                                                    className="font-medium hover:underline"
-                                                                >
-                                                                    Renew
-                                                                </Link>
-                                                            ) : (
-                                                                <span className="text-muted-foreground">
-                                                                    —
+                                                    {hasActivity && (
+                                                        <div className="mt-1 flex items-center gap-1">
+                                                            <span className="h-1.5 w-1.5 rounded-full bg-primary" />
+                                                            {dayEvents.length > 1 && (
+                                                                <span className="text-[9px] text-muted-foreground">
+                                                                    {dayEvents.length}
                                                                 </span>
                                                             )}
-                                                        </td>
-                                                    </tr>
-                                                );
-                                            },
-                                        )
-                                    )}
-                                </tbody>
-                            </table>
-                        </div>
-                    </section>
-
-                    {/* Signal History */}
-                    <section className="rounded-lg border p-5 md:col-span-2">
-                        <div className="flex items-start justify-between gap-4">
-                            <div>
-                                <h2 className="text-lg font-semibold">
-                                    Signal History
-                                </h2>
-
-                                <p className="mt-1 text-sm text-muted-foreground">
-                                    Conditions detected for this member,
-                                    including actions and outcomes.
-                                </p>
-                            </div>
-
-                            <span className="text-sm text-muted-foreground">
-                                {openSignals.length} open ·{' '}
-                                {member.signals.length} total
-                            </span>
-                        </div>
-
-                        <div className="mt-5 space-y-4">
-                            {member.signals.length === 0 ? (
-                                <div className="rounded-lg border border-dashed p-6 text-center">
-                                    <p className="font-medium">
-                                        No signals recorded.
-                                    </p>
-
-                                    <p className="mt-1 text-sm text-muted-foreground">
-                                        Signals will appear here when
-                                        the intelligence system detects
-                                        a meaningful change.
-                                    </p>
+                                                        </div>
+                                                    )}
+                                                </button>
+                                            );
+                                        })}
+                                    </div>
                                 </div>
-                            ) : (
-                                member.signals.map(
-                                    (signal) => (
+
+                                {/* Selected Day Activity Details */}
+                                <div className="rounded-lg border bg-muted/20 p-3.5">
+                                    <div className="flex items-center justify-between pb-2.5 border-b border-border/50">
+                                        <div>
+                                            <p className="text-xs font-bold">
+                                                {getSelectedDayLabel(selectedActivityDate)}
+                                            </p>
+                                            <p className="text-[11px] text-muted-foreground">
+                                                {selectedActivityEvents.length === 0
+                                                    ? 'No activity'
+                                                    : `${selectedActivityEvents.length} recorded`}
+                                            </p>
+                                        </div>
+
+                                        <Button
+                                            variant="outline"
+                                            size="sm"
+                                            type="button"
+                                            onClick={() => {
+                                                const todayKeyLocal = getIndiaDateKey(new Date().toISOString());
+                                                const today = parseDateOnly(todayKeyLocal);
+                                                setCalendarMonth(new Date(today.getFullYear(), today.getMonth(), 1));
+                                                setSelectedActivityDate(todayKeyLocal);
+                                            }}
+                                            className="h-7 text-xs px-2"
+                                        >
+                                            Today
+                                        </Button>
+                                    </div>
+
+                                    {selectedActivityEvents.length === 0 ? (
+                                        <div className="py-4 text-center text-xs text-muted-foreground">
+                                            No activity recorded on this day.
+                                        </div>
+                                    ) : (
+                                        <div className="mt-2.5 flex flex-col gap-2">
+                                            {selectedActivityEvents.map((event) => (
+                                                <TimelineEventCard key={event.id} event={event} />
+                                            ))}
+                                        </div>
+                                    )}
+                                </div>
+                        </Card>
+                    </div>
+
+                    {/* Engagement Snapshot (narrower, 2/5 cols) */}
+                    <div className="lg:col-span-2 order-1 lg:order-2 flex flex-col gap-6">
+                        <Card className="border-border h-full">
+                            <CardHeader className="flex flex-row items-center justify-between pb-3">
+                                <div>
+                                    <CardTitle className="text-base font-bold">Engagement Snapshot</CardTitle>
+                                    <CardDescription>Attendance velocity and adherence</CardDescription>
+                                </div>
+                                <Badge variant="outline" className={`gap-1 text-xs font-semibold ${attendanceTrend.className}`}>
+                                    <TrendIcon className="h-3.5 w-3.5" />
+                                    {attendanceTrend.label}
+                                </Badge>
+                            </CardHeader>
+
+                            <CardContent className="flex flex-col gap-4">
+                                <div className="grid gap-3 grid-cols-2">
+                                    <div className="rounded-lg border bg-muted/20 p-3">
+                                        <p className="text-xs text-muted-foreground font-medium">Last 14d</p>
+                                        <p className="mt-1 text-xl font-bold tracking-tight">
+                                            {attendanceSnapshot.recentVisits} <span className="text-xs font-normal text-muted-foreground">visits</span>
+                                        </p>
+                                    </div>
+
+                                    <div className="rounded-lg border bg-muted/20 p-3">
+                                        <p className="text-xs text-muted-foreground font-medium">Prior 14d</p>
+                                        <p className="mt-1 text-xl font-bold tracking-tight">
+                                            {attendanceSnapshot.previousVisits} <span className="text-xs font-normal text-muted-foreground">visits</span>
+                                        </p>
+                                    </div>
+
+                                    <div className="rounded-lg border bg-muted/20 p-3">
+                                        <p className="text-xs text-muted-foreground font-medium">Expected (14d)</p>
+                                        <p className="mt-1 text-xl font-bold tracking-tight">
+                                            {attendanceSnapshot.expectedVisitsInWindow === null
+                                                ? '—'
+                                                : `${attendanceSnapshot.expectedVisitsInWindow}`}
+                                        </p>
+                                    </div>
+
+                                    <div className="rounded-lg border bg-muted/20 p-3 col-span-2">
+                                        <p className="text-xs text-muted-foreground font-medium">Last Check-in</p>
+                                        <p className="mt-1 text-xs font-bold leading-snug">
+                                            {attendanceSnapshot.lastVisit
+                                                ? formatDateTime(attendanceSnapshot.lastVisit)
+                                                : 'No visits'}
+                                        </p>
+                                    </div>
+                                </div>
+
+                                {attendanceSnapshot.adherencePercentage !== null && (
+                                    <div className="rounded-lg border bg-muted/20 p-3">
+                                        <div className="flex items-center justify-between">
+                                            <div>
+                                                <p className="text-xs font-semibold text-foreground">Adherence</p>
+                                                <p className="text-[11px] text-muted-foreground">
+                                                    {attendanceSnapshot.recentVisits}/{attendanceSnapshot.expectedVisitsInWindow} visits
+                                                </p>
+                                            </div>
+                                            <p className="text-2xl font-extrabold text-foreground">
+                                                {attendanceSnapshot.adherencePercentage}%
+                                            </p>
+                                        </div>
+                                    </div>
+                                )}
+
+                                {attendanceSnapshot.visitGap !== null && attendanceSnapshot.visitGap < 0 && (
+                                    <Alert className="border-amber-500/30 bg-amber-500/10 text-amber-700 dark:text-amber-300 py-2.5">
+                                        <AlertTriangle className="h-4 w-4" />
+                                        <AlertTitle className="text-xs font-bold">Attendance Gap</AlertTitle>
+                                        <AlertDescription className="text-xs mt-0.5">
+                                            {Math.abs(attendanceSnapshot.visitGap)} fewer visits than target.
+                                        </AlertDescription>
+                                    </Alert>
+                                )}
+
+                                {openSignals.some((signal) => signal.type === 'attendance_decline') && (
+                                    <Alert variant="destructive" className="py-2.5">
+                                        <AlertCircle className="h-4 w-4" />
+                                        <AlertTitle className="text-xs font-bold">Decline Signal Active</AlertTitle>
+                                        <AlertDescription className="text-xs mt-0.5">
+                                            Review evidence below.
+                                        </AlertDescription>
+                                    </Alert>
+                                )}
+                            </CardContent>
+                        </Card>
+                    </div>
+                </div>
+
+                {/* ROW 3: Retention Signals & Persistent Follow-ups */}
+                <div className="grid gap-6 lg:grid-cols-5">
+                    {/* Signal History (3/5 cols) */}
+                    <div className="lg:col-span-3 flex flex-col gap-6">
+                        <Card className="border-border">
+                            <CardHeader className="flex flex-row items-center justify-between pb-3">
+                                <div>
+                                    <CardTitle className="text-base font-bold">Retention Signals</CardTitle>
+                                    <CardDescription>
+                                        System-detected risks and recorded staff actions
+                                    </CardDescription>
+                                </div>
+                                <span className="text-xs text-muted-foreground font-medium">
+                                    {openSignals.length} open · {member.signals.length} total
+                                </span>
+                            </CardHeader>
+                            <CardContent className="flex flex-col gap-4">
+                                {member.signals.length === 0 ? (
+                                    <div className="rounded-lg border border-dashed p-6 text-center">
+                                        <p className="font-semibold text-xs">No signals recorded</p>
+                                        <p className="mt-1 text-xs text-muted-foreground">
+                                            Signals will appear automatically when drop-off or expiry conditions trigger.
+                                        </p>
+                                    </div>
+                                ) : (
+                                    member.signals.map((signal) => (
                                         <SignalHistoryCard
                                             key={signal.id}
                                             memberId={member.id}
                                             signal={signal}
                                         />
-                                    ),
-                                )
-                            )}
-                        </div>
-                    </section>
+                                    ))
+                                )}
+                            </CardContent>
+                        </Card>
+                    </div>
 
-                    {/* Persistent Follow-ups */}
-                    <section className="md:col-span-2">
+                    {/* Follow-up Task Panel (2/5 cols) */}
+                    <div className="lg:col-span-2 flex flex-col">
                         <FollowUpTaskPanel
                             tasks={followUpTasks}
                             memberId={member.id}
-                            title="Follow-ups"
+                            title="Member Follow-ups"
                         />
-                    </section>
+                    </div>
+                </div>
 
-                    {/* Member-wide Intervention History */}
-                    <section className="rounded-lg border p-5 md:col-span-2">
-                        <h2 className="text-lg font-semibold">
-                            Intervention History
-                        </h2>
 
-                        <p className="mt-1 text-sm text-muted-foreground">
-                            All actions recorded for this member.
-                        </p>
+                {/* ROW 4: History & Records Tables */}
+                <div className="flex flex-col gap-6">
+                    {/* Membership History Table */}
+                    <Card className="border-border">
+                        <CardHeader className="pb-3">
+                            <CardTitle className="text-base font-bold">Membership History</CardTitle>
+                            <CardDescription>All previous memberships and payment records</CardDescription>
+                        </CardHeader>
+                        <CardContent>
+                            <div className="rounded-md border overflow-x-auto">
+                                <Table>
+                                    <TableHeader>
+                                        <TableRow className="bg-muted/30">
+                                            <TableHead>Plan</TableHead>
+                                            <TableHead>Start</TableHead>
+                                            <TableHead>End</TableHead>
+                                            <TableHead>Price</TableHead>
+                                            <TableHead>Paid</TableHead>
+                                            <TableHead>Balance</TableHead>
+                                            <TableHead>Status</TableHead>
+                                            <TableHead className="text-right">Action</TableHead>
+                                        </TableRow>
+                                    </TableHeader>
+                                    <TableBody>
+                                        {historicalMemberships.length === 0 ? (
+                                            <TableRow>
+                                                <TableCell colSpan={8} className="h-20 text-center text-xs text-muted-foreground">
+                                                    No historical memberships recorded.
+                                                </TableCell>
+                                            </TableRow>
+                                        ) : (
+                                            historicalMemberships.map((m) => {
+                                                const lifecycleStatus = m.lifecycle_status ?? m.status;
+                                                const canRenew = lifecycleStatus === 'expired';
 
-                        <div className="mt-4 space-y-4">
-                            {member.interventions.length ===
-                                0 ? (
-                                <p className="text-sm text-muted-foreground">
-                                    No interventions recorded.
-                                </p>
-                            ) : (
-                                member.interventions.map(
-                                    (
-                                        intervention,
-                                    ) => (
-                                        <div
-                                            key={
-                                                intervention.id
-                                            }
-                                            className="border-b pb-4 last:border-0"
-                                        >
-                                            <div className="flex flex-col gap-1 sm:flex-row sm:items-center sm:justify-between">
-                                                <p className="font-medium">
-                                                    {getInterventionLabel(
-                                                        intervention.type,
-                                                    )}
-                                                </p>
+                                                return (
+                                                    <TableRow key={m.id} className="hover:bg-muted/30 transition-colors">
+                                                        <TableCell className="font-semibold text-xs">
+                                                            {m.membership_plan.name}
+                                                        </TableCell>
+                                                        <TableCell className="text-xs text-muted-foreground">
+                                                            {formatDate(m.start_date)}
+                                                        </TableCell>
+                                                        <TableCell className="text-xs text-muted-foreground">
+                                                            {formatDate(m.end_date)}
+                                                        </TableCell>
+                                                        <TableCell className="text-xs">{formatCurrency(Number(m.price))}</TableCell>
+                                                        <TableCell className="text-xs font-semibold text-emerald-600">{formatCurrency(m.amount_paid)}</TableCell>
+                                                        <TableCell className="text-xs">
+                                                            <span className={m.balance_due > 0 ? 'text-destructive font-bold' : ''}>
+                                                                {formatCurrency(m.balance_due)}
+                                                            </span>
+                                                        </TableCell>
+                                                        <TableCell>
+                                                            <Badge variant="outline" className="capitalize text-[10px]">
+                                                                {lifecycleStatus}
+                                                            </Badge>
+                                                        </TableCell>
+                                                        <TableCell className="text-right">
+                                                            {canRenew ? (
+                                                                <Button variant="ghost" size="sm" asChild className="h-7 text-xs font-semibold">
+                                                                    <Link href={`/members/${member.id}/memberships/${m.id}/renew`}>
+                                                                        Renew
+                                                                    </Link>
+                                                                </Button>
+                                                            ) : (
+                                                                <span className="text-muted-foreground text-xs">—</span>
+                                                            )}
+                                                        </TableCell>
+                                                    </TableRow>
+                                                );
+                                            })
+                                        )}
+                                    </TableBody>
+                                </Table>
+                            </div>
+                        </CardContent>
+                    </Card>
 
-                                                <p className="text-xs text-muted-foreground">
-                                                    {formatDateTime(
-                                                        intervention.intervened_at,
-                                                    )}
-                                                </p>
-                                            </div>
-
-                                            {intervention.notes && (
-                                                <p className="mt-2 text-sm text-muted-foreground">
-                                                    {
-                                                        intervention.notes
-                                                    }
-                                                </p>
-                                            )}
-
-                                            {intervention.outcome && (
-                                                <div className="mt-2">
-                                                    <p className="text-xs text-muted-foreground">
-                                                        Outcome
-                                                    </p>
-
-                                                    <p className="mt-1 text-sm">
-                                                        {
-                                                            intervention.outcome
-                                                        }
-                                                    </p>
+                    {/* Intervention History & Context History in 2 Columns */}
+                    <div className="grid gap-6 lg:grid-cols-2">
+                        {/* Intervention History */}
+                        <Card className="border-border">
+                            <CardHeader className="pb-3">
+                                <CardTitle className="text-base font-bold">Intervention History</CardTitle>
+                                <CardDescription>Staff actions, member responses, and observed results</CardDescription>
+                            </CardHeader>
+                            <CardContent className="flex flex-col gap-3">
+                                {member.interventions.length === 0 ? (
+                                    <p className="text-xs text-muted-foreground py-4 text-center">
+                                        No interventions recorded yet.
+                                    </p>
+                                ) : (
+                                    <div className="divide-y divide-border">
+                                        {member.interventions.map((intervention) => (
+                                            <div key={intervention.id} className="py-3.5 first:pt-0 last:pb-0 flex flex-col gap-1.5">
+                                                <div className="flex items-start justify-between gap-3">
+                                                    <span className="font-bold text-xs">
+                                                        {getInterventionLabel(intervention.type)}
+                                                    </span>
+                                                    <span className="text-[11px] text-muted-foreground shrink-0 text-right">
+                                                        {formatDateTime(intervention.intervened_at)}
+                                                    </span>
                                                 </div>
-                                            )}
 
-                                            {intervention.signal_type && (
-                                                <p className="mt-2 text-xs text-muted-foreground">
-                                                    Trigger:{' '}
-                                                    {getSignalTypeLabel(
-                                                        intervention.signal_type,
-                                                    )}
-                                                    {intervention.signal_severity && (
-                                                        <>
-                                                            {' '}
-                                                            ·{' '}
-                                                            <span className="capitalize">
-                                                                {intervention.signal_severity}
-                                                            </span>{' '}
-                                                            severity
-                                                        </>
-                                                    )}
-                                                </p>
-                                            )}
+                                                {intervention.notes && (
+                                                    <p className="text-xs text-muted-foreground">
+                                                        {intervention.notes}
+                                                    </p>
+                                                )}
 
-                                            {intervention.follow_up_status !==
-                                                'unavailable' && (
-                                                    <div className="mt-3 rounded-md bg-muted/40 p-3">
-                                                        <p className="text-xs font-medium">
-                                                            Attendance follow-up
-                                                        </p>
+                                                {intervention.outcome && (
+                                                    <div className="rounded-md bg-muted/40 p-2 text-xs">
+                                                        <span className="font-semibold text-foreground">Outcome: </span>
+                                                        <span className="text-muted-foreground">{intervention.outcome}</span>
+                                                    </div>
+                                                )}
 
-                                                        {intervention.follow_up_status ===
-                                                            'in_progress' ? (
-                                                            <p className="mt-1 text-xs text-muted-foreground">
-                                                                The 14-day follow-up window is still in progress.
+                                                {intervention.follow_up_status !== 'unavailable' && (
+                                                    <div className="mt-1 rounded-md border bg-muted/20 p-2 text-[11px]">
+                                                        <p className="font-semibold">Observed Attendance Impact</p>
+                                                        {intervention.follow_up_status === 'in_progress' ? (
+                                                            <p className="text-muted-foreground">
+                                                                14-day observation window is in progress.
                                                             </p>
                                                         ) : (
-                                                            <>
-                                                                <div className="mt-2 grid grid-cols-3 gap-3 text-xs">
-                                                                    <div>
-                                                                        <p className="text-muted-foreground">
-                                                                            Before
-                                                                        </p>
-                                                                        <p className="mt-1 font-medium">
-                                                                            {intervention.attendance_before_14d ?? 0}{' '}
-                                                                            visits
-                                                                        </p>
-                                                                    </div>
-                                                                    <div>
-                                                                        <p className="text-muted-foreground">
-                                                                            After
-                                                                        </p>
-                                                                        <p className="mt-1 font-medium">
-                                                                            {intervention.attendance_after_14d ?? 0}{' '}
-                                                                            visits
-                                                                        </p>
-                                                                    </div>
-                                                                    <div>
-                                                                        <p className="text-muted-foreground">
-                                                                            Change
-                                                                        </p>
-                                                                        <p className="mt-1 font-medium">
-                                                                            {
-                                                                                (intervention.attendance_change ?? 0) > 0
-                                                                                    ? '+'
-                                                                                    : ''
-                                                                            }
-                                                                            {intervention.attendance_change ?? 0}
-                                                                        </p>
-                                                                    </div>
+                                                            <div className="mt-1.5 grid grid-cols-3 gap-2 text-center">
+                                                                <div className="rounded border bg-card p-1">
+                                                                    <span className="text-muted-foreground">Before</span>
+                                                                    <p className="font-bold">{intervention.attendance_before_14d ?? 0}</p>
                                                                 </div>
-
-                                                                <p className="mt-2 text-[11px] text-muted-foreground">
-                                                                    Observed attendance change after the intervention; this is context, not proof of causation.
-                                                                </p>
-                                                            </>
+                                                                <div className="rounded border bg-card p-1">
+                                                                    <span className="text-muted-foreground">After</span>
+                                                                    <p className="font-bold">{intervention.attendance_after_14d ?? 0}</p>
+                                                                </div>
+                                                                <div className="rounded border bg-card p-1">
+                                                                    <span className="text-muted-foreground">Change</span>
+                                                                    <p className={`font-bold ${(intervention.attendance_change ?? 0) > 0 ? 'text-emerald-600' : ''}`}>
+                                                                        {(intervention.attendance_change ?? 0) > 0 ? '+' : ''}
+                                                                        {intervention.attendance_change ?? 0}
+                                                                    </p>
+                                                                </div>
+                                                            </div>
                                                         )}
                                                     </div>
                                                 )}
-                                        </div>
-                                    ),
-                                )
-                            )}
-                        </div>
-                    </section>
+                                            </div>
+                                        ))}
+                                    </div>
+                                )}
+                            </CardContent>
+                        </Card>
+
+                        {/* Context History */}
+                        <Card className="border-border">
+                            <CardHeader className="pb-3">
+                                <CardTitle className="text-base font-bold">Context History</CardTitle>
+                                <CardDescription>Timeline of expectation and goal changes</CardDescription>
+                            </CardHeader>
+                            <CardContent className="flex flex-col gap-4">
+                                <div className="flex flex-col gap-2">
+                                    <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Attendance Expectations</p>
+                                    <div className="divide-y divide-border rounded-md border bg-muted/10">
+                                        {member.expectations.length === 0 ? (
+                                            <p className="p-3 text-xs text-muted-foreground">No expectation changes recorded.</p>
+                                        ) : (
+                                            [...member.expectations]
+                                                .sort((a, b) => b.start_date.localeCompare(a.start_date))
+                                                .map((expectation) => (
+                                                    <div key={expectation.id} className="p-2.5 flex items-center justify-between gap-3 text-xs">
+                                                        <div className="min-w-0">
+                                                            <p className="font-bold">
+                                                                {expectation.visits_per_week} visits / week
+                                                            </p>
+                                                            <p className="text-[11px] text-muted-foreground">
+                                                                {formatDate(expectation.start_date)} → {expectation.end_date ? formatDate(expectation.end_date) : 'Present'}
+                                                            </p>
+                                                        </div>
+                                                        <Badge variant={expectation.end_date === null ? "default" : "secondary"} className="text-[10px] shrink-0">
+                                                            {expectation.end_date === null ? 'Current' : 'Past'}
+                                                        </Badge>
+                                                    </div>
+                                                ))
+                                        )}
+                                    </div>
+                                </div>
+
+                                <div className="flex flex-col gap-2">
+                                    <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Goal Timeline</p>
+                                    <div className="divide-y divide-border rounded-md border bg-muted/10">
+                                        {member.goals.length === 0 ? (
+                                            <p className="p-3 text-xs text-muted-foreground">No goal changes recorded.</p>
+                                        ) : (
+                                            [...member.goals]
+                                                .sort((a, b) => b.start_date.localeCompare(a.start_date))
+                                                .map((goal) => (
+                                                    <div key={goal.id} className="p-2.5 flex items-center justify-between gap-3 text-xs">
+                                                        <div className="min-w-0">
+                                                            <p className="font-bold capitalize">
+                                                                {goal.goal.replace(/_/g, ' ')}
+                                                            </p>
+                                                            <p className="text-[11px] text-muted-foreground">
+                                                                {formatDate(goal.start_date)} → {goal.end_date ? formatDate(goal.end_date) : 'Present'}
+                                                            </p>
+                                                        </div>
+                                                        <Badge variant={goal.end_date === null ? "default" : "secondary"} className="text-[10px] shrink-0">
+                                                            {goal.end_date === null ? 'Current' : 'Past'}
+                                                        </Badge>
+                                                    </div>
+                                                ))
+                                        )}
+                                    </div>
+                                </div>
+                            </CardContent>
+                        </Card>
+                    </div>
                 </div>
             </div>
         </>
     );
 }
 
-function TimelineEvent({
-    event,
-    compact = false,
-}: {
-    event: TimelineEvent;
-    compact?: boolean;
-}) {
+function TimelineEventCard({ event }: { event: TimelineEvent }) {
     return (
-        <div
-            className={`relative flex gap-3 ${compact ? 'rounded-lg border bg-muted/20 p-3' : ''
-                }`}
-        >
-            <div className="relative mt-1.5 flex w-3 shrink-0 justify-center">
-                <div className="h-2.5 w-2.5 rounded-full bg-foreground" />
-            </div>
-
-            <div className="min-w-0 flex-1">
-                <div className="flex flex-col gap-1 sm:flex-row sm:items-center sm:justify-between">
-                    <p className="font-medium">
+        <div className="flex items-start gap-2.5 rounded-md border bg-card p-2.5 text-xs">
+            <div className="mt-1 flex h-2 w-2 rounded-full bg-primary shrink-0" />
+            <div className="flex-1 min-w-0">
+                <div className="flex items-center justify-between gap-1">
+                    <p className="font-semibold text-foreground">
                         {getTimelineTitle(event)}
                     </p>
-
-                    <p className="text-xs text-muted-foreground">
+                    <p className="text-[10px] text-muted-foreground">
                         {formatTimelineEventTime(event)}
                     </p>
                 </div>
-
                 <TimelineEventContent event={event} />
             </div>
         </div>
     );
 }
 
-function TimelineEventContent({
-    event,
-}: {
-    event: TimelineEvent;
-}) {
+function TimelineEventContent({ event }: { event: TimelineEvent }) {
     switch (event.type) {
         case 'membership_started':
             return (
-                <p className="mt-1 text-sm text-muted-foreground">
-                    {event.data.plan ?? 'Membership'} ·{' '}
-                    {formatCurrency(event.data.price ?? 0)}
-                    {event.data.end_date && (
-                        <>
-                            {' '}
-                            · ends{' '}
-                            {formatDate(event.data.end_date)}
-                        </>
-                    )}
+                <p className="mt-0.5 text-xs text-muted-foreground">
+                    {event.data.plan ?? 'Membership'} · {formatCurrency(event.data.price ?? 0)}
+                    {event.data.end_date && <> · ends {formatDate(event.data.end_date)}</>}
                 </p>
             );
 
         case 'payment_received':
             return (
-                <p className="mt-1 text-sm text-muted-foreground">
-                    {formatCurrency(event.data.amount ?? 0)} via{' '}
-                    {formatPaymentMethod(
-                        event.data.payment_method,
-                    )}
+                <p className="mt-0.5 text-xs text-muted-foreground">
+                    {formatCurrency(event.data.amount ?? 0)} via {formatPaymentMethod(event.data.payment_method)}
                 </p>
             );
 
         case 'attendance_recorded':
             return (
-                <p className="mt-1 text-sm text-muted-foreground">
-                    Check-in source:{' '}
-                    {event.data.source ?? 'manual'}
+                <p className="mt-0.5 text-xs text-muted-foreground">
+                    Check-in source: {event.data.source ?? 'manual'}
                 </p>
             );
 
         case 'signal_detected':
             return (
-                <div className="mt-1">
-                    <p className="text-sm text-muted-foreground">
-                        {getSignalTypeLabel(
-                            event.data.signal_type ?? '',
-                        )}
-                    </p>
-
+                <div className="mt-0.5 text-xs text-muted-foreground">
+                    <p>{getSignalTypeLabel(event.data.signal_type ?? '')}</p>
                     {event.data.severity && (
-                        <p className="mt-1 text-xs capitalize text-muted-foreground">
-                            Severity: {event.data.severity}
-                        </p>
+                        <p className="capitalize">Severity: {event.data.severity}</p>
                     )}
                 </div>
             );
 
         case 'intervention_recorded':
             return (
-                <div className="mt-1">
-                    <p className="text-sm text-muted-foreground">
-                        {getInterventionLabel(
-                            event.data.type ?? '',
-                        )}
-                    </p>
-
-                    {event.data.notes && (
-                        <p className="mt-1 text-sm text-muted-foreground">
-                            {event.data.notes}
-                        </p>
-                    )}
-
-                    {event.data.outcome && (
-                        <p className="mt-1 text-sm text-muted-foreground">
-                            Outcome: {event.data.outcome}
-                        </p>
-                    )}
+                <div className="mt-0.5 text-xs text-muted-foreground">
+                    <p>{getInterventionLabel(event.data.type ?? '')}</p>
+                    {event.data.notes && <p className="italic">{event.data.notes}</p>}
+                    {event.data.outcome && <p>Outcome: {event.data.outcome}</p>}
                 </div>
             );
 
         case 'signal_resolved':
             return (
-                <p className="mt-1 text-sm text-muted-foreground">
+                <p className="mt-0.5 text-xs text-emerald-600 dark:text-emerald-400">
                     The underlying condition recovered.
                 </p>
             );
 
         case 'signal_dismissed':
             return (
-                <div className="mt-1">
-                    {event.data.reason && (
-                        <p className="text-sm text-muted-foreground">
-                            {getDismissalReasonLabel(
-                                event.data.reason,
-                            )}
-                        </p>
-                    )}
-
-                    {event.data.notes && (
-                        <p className="mt-1 text-sm text-muted-foreground">
-                            {event.data.notes}
-                        </p>
-                    )}
+                <div className="mt-0.5 text-xs text-muted-foreground">
+                    {event.data.reason && <p>{getDismissalReasonLabel(event.data.reason)}</p>}
+                    {event.data.notes && <p className="italic">{event.data.notes}</p>}
                 </div>
             );
 
@@ -2654,123 +2173,77 @@ function SignalHistoryCard({
         outcome: '',
     });
 
-    const status = getSignalStatusPresentation(
-        signal.status,
-    );
+    const status = getSignalStatusPresentation(signal.status);
+    const severity = getSeverityPresentation(signal.severity);
+    const isAttendanceDecline = signal.type === 'attendance_decline';
+    const isMembershipExpiring = signal.type === 'membership_expiring';
 
-    const severity = getSeverityPresentation(
-        signal.severity,
-    );
-
-    const isAttendanceDecline =
-        signal.type === 'attendance_decline';
-
-    const isMembershipExpiring =
-        signal.type === 'membership_expiring';
-
-    const submit = (
-        event: FormEvent<HTMLFormElement>,
-    ) => {
+    const submit = (event: FormEvent<HTMLFormElement>) => {
         event.preventDefault();
 
-        transform((data) => ({
-            ...data,
+        transform((formData) => ({
+            ...formData,
             signal_id: signal.id,
-            notes: data.notes || null,
-            outcome: data.outcome || null,
+            notes: formData.notes || null,
+            outcome: formData.outcome || null,
         }));
 
-        post(
-            `/members/${memberId}/interventions`,
-            {
-                preserveScroll: true,
-
-                onSuccess: () => {
-                    reset('type', 'notes', 'outcome');
-                },
+        post(`/members/${memberId}/interventions`, {
+            preserveScroll: true,
+            onSuccess: () => {
+                reset('type', 'notes', 'outcome');
             },
-        );
+        });
     };
 
     return (
-        <article className="overflow-hidden rounded-lg border">
-            <div className="p-5">
-                {/* Signal header */}
-                <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
-                    <div>
-                        <div className="flex flex-wrap items-center gap-2">
-                            <h3 className="font-semibold">
-                                {getSignalTypeLabel(
-                                    signal.type,
-                                )}
-                            </h3>
-
-                            <span
-                                className={`rounded-full border px-2.5 py-1 text-xs font-medium capitalize ${severity.className}`}
-                            >
-                                {signal.severity}
-                            </span>
-
-                            <span
-                                className={`rounded-full border px-2.5 py-1 text-xs font-medium ${status.className}`}
-                            >
-                                {status.label}
-                            </span>
-                        </div>
-
-                        <p className="mt-1 text-xs text-muted-foreground">
-                            Detected{' '}
-                            {formatDateTime(
-                                signal.detected_at,
-                            )}
-                        </p>
+        <Card className="overflow-hidden border border-border">
+            <CardHeader className="pb-3 flex flex-col gap-2">
+                <div className="flex flex-wrap items-center justify-between gap-2">
+                    <div className="flex items-center gap-2">
+                        <CardTitle className="text-sm font-bold">
+                            {getSignalTypeLabel(signal.type)}
+                        </CardTitle>
+                        <Badge variant={severity.badgeVariant} className={severity.className}>
+                            {signal.severity}
+                        </Badge>
+                        <Badge variant={status.badgeVariant} className={status.className}>
+                            {status.label}
+                        </Badge>
                     </div>
+                    <span className="text-xs text-muted-foreground">
+                        Detected {formatDateTime(signal.detected_at)}
+                    </span>
                 </div>
+            </CardHeader>
 
-                {/* Attendance evidence */}
+            <CardContent className="flex flex-col gap-3 text-xs">
+                {/* Attendance decline evidence */}
                 {isAttendanceDecline && (
-                    <div className="mt-5">
-                        {signal.evidence
-                            .decline_percentage !==
-                            undefined && (
-                                <p className="text-sm">
-                                    Attendance declined by{' '}
-                                    <span className="font-semibold">
-                                        {
-                                            signal.evidence
-                                                .decline_percentage
-                                        }
-                                        %
-                                    </span>
-                                    .
-                                </p>
+                    <div className="flex flex-col gap-2.5">
+                        {signal.evidence.decline_percentage !== undefined && (
+                            <p className="text-xs font-medium">
+                                Attendance declined by{' '}
+                                <span className="text-destructive font-bold">
+                                    {signal.evidence.decline_percentage}%
+                                </span>
+                            </p>
+                        )}
+                        <div className="grid gap-2.5 sm:grid-cols-3">
+                            {signal.evidence.baseline_average !== undefined && (
+                                <EvidenceItem
+                                    label="Baseline"
+                                    value={`${signal.evidence.baseline_average}/week`}
+                                />
                             )}
-
-                        <div className="mt-3 grid gap-3 sm:grid-cols-3">
-                            {signal.evidence
-                                .baseline_average !==
-                                undefined && (
-                                    <EvidenceItem
-                                        label="Baseline"
-                                        value={`${signal.evidence.baseline_average}/week`}
-                                    />
-                                )}
-
-                            {signal.evidence
-                                .recent_average !==
-                                undefined && (
-                                    <EvidenceItem
-                                        label="Recent"
-                                        value={`${signal.evidence.recent_average}/week`}
-                                    />
-                                )}
-
-                            {signal.evidence
-                                .expected_visits_per_week !==
-                                undefined &&
-                                signal.evidence
-                                    .expected_visits_per_week !==
-                                null && (
+                            {signal.evidence.recent_average !== undefined && (
+                                <EvidenceItem
+                                    label="Recent"
+                                    value={`${signal.evidence.recent_average}/week`}
+                                />
+                            )}
+                            {signal.evidence.expected_visits_per_week !== undefined &&
+                                signal.evidence.expected_visits_per_week !== null && (
                                     <EvidenceItem
                                         label="Expected"
                                         value={`${signal.evidence.expected_visits_per_week}/week`}
@@ -2780,339 +2253,173 @@ function SignalHistoryCard({
                     </div>
                 )}
 
-                {/* Membership expiry evidence */}
+                {/* Membership expiring evidence */}
                 {isMembershipExpiring && (
-                    <div className="mt-5">
-                        {signal.evidence
-                            .days_remaining !==
-                            undefined && (
-                                <p className="text-sm">
-                                    Membership expires in{' '}
-                                    <span className="font-semibold">
-                                        {
-                                            signal.evidence
-                                                .days_remaining
-                                        }{' '}
-                                        {signal.evidence
-                                            .days_remaining ===
-                                            1
-                                            ? 'day'
-                                            : 'days'}
-                                    </span>
-                                    .
-                                </p>
+                    <div className="flex flex-col gap-2.5">
+                        {signal.evidence.days_remaining !== undefined && (
+                            <p className="text-xs font-medium">
+                                Membership expires in{' '}
+                                <span className="font-bold text-amber-600">
+                                    {signal.evidence.days_remaining}{' '}
+                                    {signal.evidence.days_remaining === 1 ? 'day' : 'days'}
+                                </span>
+                            </p>
+                        )}
+                        <div className="grid gap-2.5 sm:grid-cols-3">
+                            {signal.evidence.membership_end_date && (
+                                <EvidenceItem
+                                    label="Ends"
+                                    value={formatDate(signal.evidence.membership_end_date)}
+                                />
                             )}
-
-                        <div className="mt-3 grid gap-3 sm:grid-cols-3">
-                            {signal.evidence
-                                .membership_end_date && (
-                                    <EvidenceItem
-                                        label="Ends"
-                                        value={formatDate(
-                                            signal.evidence
-                                                .membership_end_date,
-                                        )}
-                                    />
-                                )}
-
                             {signal.evidence.plan && (
                                 <EvidenceItem
                                     label="Plan"
-                                    value={
-                                        signal.evidence
-                                            .plan
-                                    }
+                                    value={signal.evidence.plan}
                                 />
                             )}
-
-                            {signal.evidence.price !==
-                                undefined && (
-                                    <EvidenceItem
-                                        label="Price"
-                                        value={`₹${signal.evidence.price}`}
-                                    />
-                                )}
+                            {signal.evidence.price !== undefined && (
+                                <EvidenceItem
+                                    label="Price"
+                                    value={`₹${signal.evidence.price}`}
+                                />
+                            )}
                         </div>
                     </div>
                 )}
 
                 {/* Resolution */}
-                {signal.status === 'resolved' &&
-                    signal.resolved_at && (
-                        <div className="mt-5 rounded-lg border bg-muted/20 p-4">
-                            <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
-                                Resolution
-                            </p>
-
-                            <p className="mt-1 text-sm">
-                                The underlying condition recovered and the
-                                signal was automatically resolved.
-                            </p>
-
-                            <p className="mt-2 text-xs text-muted-foreground">
-                                Resolved{' '}
-                                {formatDateTime(
-                                    signal.resolved_at,
-                                )}
-                            </p>
-                        </div>
-                    )}
+                {signal.status === 'resolved' && signal.resolved_at && (
+                    <div className="rounded-lg border bg-muted/20 p-2.5 text-xs">
+                        <p className="font-semibold uppercase tracking-wider text-muted-foreground text-[10px]">Resolution</p>
+                        <p className="mt-0.5 font-medium text-emerald-600 dark:text-emerald-400">
+                            The underlying condition recovered and the signal was automatically resolved.
+                        </p>
+                        <p className="mt-0.5 text-muted-foreground text-[10px]">
+                            Resolved {formatDateTime(signal.resolved_at)}
+                        </p>
+                    </div>
+                )}
 
                 {/* Dismissal */}
                 {signal.status === 'dismissed' && (
-                    <div className="mt-5 rounded-lg border bg-muted/20 p-4">
-                        <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
-                            Dismissal
-                        </p>
-
+                    <div className="rounded-lg border bg-muted/20 p-2.5 text-xs">
+                        <p className="font-semibold uppercase tracking-wider text-muted-foreground text-[10px]">Dismissal</p>
                         {signal.dismissal_reason && (
-                            <p className="mt-1 text-sm font-medium">
-                                {getDismissalReasonLabel(
-                                    signal.dismissal_reason,
-                                )}
-                            </p>
+                            <p className="mt-0.5 font-medium">{getDismissalReasonLabel(signal.dismissal_reason)}</p>
                         )}
-
                         {signal.dismissal_notes && (
-                            <p className="mt-2 text-sm text-muted-foreground">
-                                {signal.dismissal_notes}
-                            </p>
+                            <p className="mt-0.5 text-muted-foreground">{signal.dismissal_notes}</p>
                         )}
-
                         {signal.dismissed_at && (
-                            <p className="mt-3 text-xs text-muted-foreground">
-                                Dismissed{' '}
-                                {formatDateTime(
-                                    signal.dismissed_at,
-                                )}
+                            <p className="mt-0.5 text-muted-foreground text-[10px]">
+                                Dismissed {formatDateTime(signal.dismissed_at)}
                             </p>
                         )}
                     </div>
                 )}
 
-                {/* Interventions */}
+                {/* Signal Interventions */}
                 {signal.interventions.length > 0 && (
-                    <div className="mt-5 border-t pt-5">
-                        <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
-                            Interventions
+                    <div className="border-t pt-3">
+                        <p className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
+                            Recorded Staff Actions
                         </p>
-
-                        <div className="mt-3 space-y-3">
-                            {signal.interventions.map(
-                                (intervention) => (
-                                    <div
-                                        key={
-                                            intervention.id
-                                        }
-                                        className="rounded-lg border bg-muted/20 p-4"
-                                    >
-                                        <div className="flex flex-col gap-1 sm:flex-row sm:items-center sm:justify-between">
-                                            <p className="text-sm font-medium">
-                                                {getInterventionLabel(
-                                                    intervention.type,
-                                                )}
-                                            </p>
-
-                                            <p className="text-xs text-muted-foreground">
-                                                {formatDateTime(
-                                                    intervention.intervened_at,
-                                                )}
-                                            </p>
-                                        </div>
-
-                                        {intervention.notes && (
-                                            <p className="mt-2 text-sm text-muted-foreground">
-                                                {
-                                                    intervention.notes
-                                                }
-                                            </p>
-                                        )}
-
-                                        {intervention.outcome && (
-                                            <div className="mt-3">
-                                                <p className="text-xs text-muted-foreground">
-                                                    Outcome
-                                                </p>
-
-                                                <p className="mt-1 text-sm">
-                                                    {
-                                                        intervention.outcome
-                                                    }
-                                                </p>
-                                            </div>
-                                        )}
+                        <div className="mt-2 flex flex-col gap-2">
+                            {signal.interventions.map((interv) => (
+                                <div key={interv.id} className="rounded-md border bg-card p-2.5 text-xs">
+                                    <div className="flex justify-between items-center">
+                                        <span className="font-bold">{getInterventionLabel(interv.type)}</span>
+                                        <span className="text-[10px] text-muted-foreground">{formatDateTime(interv.intervened_at)}</span>
                                     </div>
-                                ),
-                            )}
+                                    {interv.notes && <p className="mt-1 text-muted-foreground">{interv.notes}</p>}
+                                    {interv.outcome && (
+                                        <p className="mt-0.5 font-medium">Outcome: {interv.outcome}</p>
+                                    )}
+                                </div>
+                            ))}
                         </div>
                     </div>
                 )}
 
-                {/* Record intervention */}
+                {/* Record intervention form for open signals */}
                 {signal.status === 'open' && (
-                    <form
-                        onSubmit={submit}
-                        className="mt-5 border-t pt-5"
-                    >
-                        <p className="text-sm font-medium">
-                            Record intervention
-                        </p>
-
-                        <div className="mt-4 grid gap-4">
-                            <div>
-                                <label
-                                    htmlFor={`type-${signal.id}`}
-                                    className="mb-1.5 block text-sm font-medium"
-                                >
-                                    Action
-                                </label>
-
-                                <select
-                                    id={`type-${signal.id}`}
-                                    value={data.type}
-                                    onChange={(event) =>
-                                        setData(
-                                            'type',
-                                            event.target.value,
-                                        )
-                                    }
-                                    disabled={processing}
-                                    className="h-10 w-full rounded-md border bg-background px-3 text-sm"
-                                >
-                                    <option
-                                        value=""
-                                        disabled
-                                    >
-                                        Choose an action
-                                    </option>
-
-                                    {interventionTypes.map(
-                                        (option) => (
-                                            <option
-                                                key={
-                                                    option.value
-                                                }
-                                                value={
-                                                    option.value
-                                                }
-                                            >
-                                                {
-                                                    option.label
-                                                }
-                                            </option>
-                                        ),
-                                    )}
-                                </select>
-
-                                {errors.type && (
-                                    <p className="mt-1 text-sm text-destructive">
-                                        {errors.type}
-                                    </p>
-                                )}
-                            </div>
-
-                            <div>
-                                <label
-                                    htmlFor={`notes-${signal.id}`}
-                                    className="mb-1.5 block text-sm font-medium"
-                                >
-                                    Notes
-                                </label>
-
-                                <textarea
-                                    id={`notes-${signal.id}`}
-                                    value={data.notes}
-                                    onChange={(event) =>
-                                        setData(
-                                            'notes',
-                                            event.target.value,
-                                        )
-                                    }
-                                    disabled={processing}
-                                    rows={3}
-                                    placeholder="What did you discuss or do?"
-                                    className="w-full resize-y rounded-md border bg-background px-3 py-2 text-sm"
-                                />
-
-                                {errors.notes && (
-                                    <p className="mt-1 text-sm text-destructive">
-                                        {
-                                            errors.notes
-                                        }
-                                    </p>
-                                )}
-                            </div>
-
-                            <div>
-                                <label
-                                    htmlFor={`outcome-${signal.id}`}
-                                    className="mb-1.5 block text-sm font-medium"
-                                >
-                                    Outcome
-                                </label>
-
-                                <textarea
-                                    id={`outcome-${signal.id}`}
-                                    value={data.outcome}
-                                    onChange={(event) =>
-                                        setData(
-                                            'outcome',
-                                            event.target.value,
-                                        )
-                                    }
-                                    disabled={processing}
-                                    rows={3}
-                                    placeholder="What happened?"
-                                    className="w-full resize-y rounded-md border bg-background px-3 py-2 text-sm"
-                                />
-
-                                {errors.outcome && (
-                                    <p className="mt-1 text-sm text-destructive">
-                                        {
-                                            errors.outcome
-                                        }
-                                    </p>
-                                )}
-                            </div>
-
-                            <button
-                                type="submit"
-                                disabled={
-                                    processing ||
-                                    !data.type
-                                }
-                                className="w-fit rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground disabled:cursor-not-allowed disabled:opacity-50"
+                    <form onSubmit={submit} className="border-t pt-3 flex flex-col gap-2.5">
+                        <p className="text-xs font-bold">Record Action on Signal</p>
+                        <div className="flex flex-col gap-1">
+                            <Label htmlFor={`type-${signal.id}`} className="text-[11px]">Action Type</Label>
+                            <select
+                                id={`type-${signal.id}`}
+                                value={data.type}
+                                onChange={(e) => setData('type', e.target.value)}
+                                disabled={processing}
+                                className="h-8 w-full rounded-md border border-input bg-background px-3 text-xs focus:outline-none focus:ring-2 focus:ring-ring"
                             >
-                                {processing
-                                    ? 'Recording...'
-                                    : 'Record Intervention'}
-                            </button>
+                                <option value="" disabled>Choose an action</option>
+                                {interventionTypes.map((opt) => (
+                                    <option key={opt.value} value={opt.value}>
+                                        {opt.label}
+                                    </option>
+                                ))}
+                            </select>
+                            {errors.type && <p className="text-xs text-destructive">{errors.type}</p>}
                         </div>
+
+                        <div className="flex flex-col gap-1">
+                            <Label htmlFor={`notes-${signal.id}`} className="text-[11px]">Notes</Label>
+                            <Textarea
+                                id={`notes-${signal.id}`}
+                                value={data.notes}
+                                onChange={(e) => setData('notes', e.target.value)}
+                                disabled={processing}
+                                rows={2}
+                                placeholder="What did you discuss or do?"
+                                className="text-xs"
+                            />
+                            {errors.notes && <p className="text-xs text-destructive">{errors.notes}</p>}
+                        </div>
+
+                        <div className="flex flex-col gap-1">
+                            <Label htmlFor={`outcome-${signal.id}`} className="text-[11px]">Outcome</Label>
+                            <Textarea
+                                id={`outcome-${signal.id}`}
+                                value={data.outcome}
+                                onChange={(e) => setData('outcome', e.target.value)}
+                                disabled={processing}
+                                rows={2}
+                                placeholder="What happened or what was agreed?"
+                                className="text-xs"
+                            />
+                            {errors.outcome && <p className="text-xs text-destructive">{errors.outcome}</p>}
+                        </div>
+
+                        <Button
+                            type="submit"
+                            disabled={processing || !data.type}
+                            size="sm"
+                            className="w-fit gap-1.5 h-8 text-xs"
+                        >
+                            {processing ? (
+                                <>
+                                    <Spinner className="h-3.5 w-3.5" />
+                                    Recording...
+                                </>
+                            ) : (
+                                'Record Intervention'
+                            )}
+                        </Button>
                     </form>
                 )}
-            </div>
-        </article>
+            </CardContent>
+        </Card>
     );
 }
 
-type EvidenceItemProps = {
-    label: string;
-    value: string;
-};
-
-function EvidenceItem({
-    label,
-    value,
-}: EvidenceItemProps) {
+function EvidenceItem({ label, value }: { label: string; value: string }) {
     return (
-        <div className="rounded-lg border bg-muted/20 p-3">
-            <p className="text-xs text-muted-foreground">
-                {label}
-            </p>
-
-            <p className="mt-1 text-sm font-medium">
-                {value}
-            </p>
+        <div className="rounded-md border bg-muted/20 p-2">
+            <p className="text-[10px] text-muted-foreground">{label}</p>
+            <p className="mt-0.5 text-xs font-bold">{value}</p>
         </div>
     );
 }

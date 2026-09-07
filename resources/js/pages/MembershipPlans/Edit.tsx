@@ -1,6 +1,19 @@
 import { Head, Link, useForm } from '@inertiajs/react';
+import { ArrowLeft, CreditCard } from 'lucide-react';
 import * as React from 'react';
-
+import InputError from '@/components/input-error';
+import { Button } from '@/components/ui/button';
+import {
+    Card,
+    CardContent,
+    CardDescription,
+    CardFooter,
+    CardHeader,
+    CardTitle,
+} from '@/components/ui/card';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import { Spinner } from '@/components/ui/spinner';
 import { dashboard } from '@/routes';
 import membershipPlans from '@/routes/membership-plans';
 
@@ -25,7 +38,6 @@ export default function Edit({ plan }: EditProps) {
 
     const submit = (event: React.FormEvent<HTMLFormElement>) => {
         event.preventDefault();
-
         put(membershipPlans.update(plan.id).url);
     };
 
@@ -33,152 +45,116 @@ export default function Edit({ plan }: EditProps) {
         <>
             <Head title={`Edit ${plan.name}`} />
 
-            <div className="flex h-full flex-1 flex-col gap-6 p-6">
+            <div className="flex h-full flex-1 flex-col gap-6 p-4 sm:p-6 max-w-7xl mx-auto w-full">
                 <div>
-                    <Link
-                        href={membershipPlans.index()}
-                        className="text-sm text-muted-foreground hover:underline"
-                    >
-                        ← Back to Membership Plans
-                    </Link>
+                    <Button variant="ghost" size="sm" asChild className="-ml-3 mb-2 text-muted-foreground">
+                        <Link href={membershipPlans.index()}>
+                            <ArrowLeft data-icon="inline-start" className="size-4" />
+                            Back to Membership Plans
+                        </Link>
+                    </Button>
 
-                    <div className="mt-4">
-                        <h1 className="text-2xl font-semibold tracking-tight">
-                            Edit Membership Plan
-                        </h1>
-
-                        <p className="mt-1 text-sm text-muted-foreground">
-                            Update the plan used for future memberships and
-                            renewals.
-                        </p>
-                    </div>
+                    <h1 className="text-2xl font-bold tracking-tight">
+                        Edit Membership Plan
+                    </h1>
+                    <p className="mt-1 text-sm text-muted-foreground">
+                        Update pricing and terms for future memberships.
+                    </p>
                 </div>
 
-                <section className="max-w-2xl rounded-xl border p-6">
-                    <form onSubmit={submit} className="space-y-5">
-                        <div>
-                            <label
-                                htmlFor="name"
-                                className="mb-2 block text-sm font-medium"
-                            >
-                                Plan Name
-                            </label>
+                <div className="max-w-2xl">
+                    <Card>
+                        <form onSubmit={submit}>
+                            <CardHeader>
+                                <CardTitle className="text-lg">Plan Details</CardTitle>
+                                <CardDescription>
+                                    Existing active memberships under this plan will remain unchanged.
+                                </CardDescription>
+                            </CardHeader>
 
-                            <input
-                                id="name"
-                                type="text"
-                                value={data.name}
-                                onChange={(event) =>
-                                    setData('name', event.target.value)
-                                }
-                                className="w-full rounded-md border bg-background px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-ring"
-                            />
+                            <CardContent className="flex flex-col gap-5">
+                                <div className="flex flex-col gap-2">
+                                    <Label htmlFor="name">Plan Name</Label>
+                                    <Input
+                                        id="name"
+                                        type="text"
+                                        value={data.name}
+                                        onChange={(event) =>
+                                            setData('name', event.target.value)
+                                        }
+                                        required
+                                    />
+                                    <InputError message={errors.name} />
+                                </div>
 
-                            {errors.name && (
-                                <p className="mt-1 text-sm text-destructive">
-                                    {errors.name}
-                                </p>
-                            )}
-                        </div>
+                                <div className="grid gap-5 sm:grid-cols-2">
+                                    <div className="flex flex-col gap-2">
+                                        <Label htmlFor="price">Price (₹)</Label>
+                                        <Input
+                                            id="price"
+                                            type="number"
+                                            min="0"
+                                            step="0.01"
+                                            value={data.price}
+                                            onChange={(event) =>
+                                                setData('price', event.target.value)
+                                            }
+                                            required
+                                        />
+                                        <InputError message={errors.price} />
+                                    </div>
 
-                        <div>
-                            <label
-                                htmlFor="price"
-                                className="mb-2 block text-sm font-medium"
-                            >
-                                Price
-                            </label>
+                                    <div className="flex flex-col gap-2">
+                                        <Label htmlFor="duration_days">Duration (Days)</Label>
+                                        <Input
+                                            id="duration_days"
+                                            type="number"
+                                            min="1"
+                                            step="1"
+                                            value={data.duration_days}
+                                            onChange={(event) =>
+                                                setData(
+                                                    'duration_days',
+                                                    event.target.value,
+                                                )
+                                            }
+                                            required
+                                        />
+                                        <InputError message={errors.duration_days} />
+                                    </div>
+                                </div>
 
-                            <input
-                                id="price"
-                                type="number"
-                                min="0"
-                                step="0.01"
-                                value={data.price}
-                                onChange={(event) =>
-                                    setData('price', event.target.value)
-                                }
-                                className="w-full rounded-md border bg-background px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-ring"
-                            />
+                                <div className="rounded-lg border bg-muted/40 p-4">
+                                    <div className="flex items-start gap-3">
+                                        <CreditCard className="mt-0.5 size-4 text-muted-foreground" />
+                                        <div className="text-xs text-muted-foreground">
+                                            <span className="font-semibold text-foreground">Term: </span>
+                                            {data.duration_days} calendar days from start date.
+                                        </div>
+                                    </div>
+                                </div>
+                            </CardContent>
 
-                            <p className="mt-1 text-xs text-muted-foreground">
-                                Changing this price affects future
-                                memberships only. Existing memberships keep
-                                their recorded price.
-                            </p>
-
-                            {errors.price && (
-                                <p className="mt-1 text-sm text-destructive">
-                                    {errors.price}
-                                </p>
-                            )}
-                        </div>
-
-                        <div>
-                            <label
-                                htmlFor="duration_days"
-                                className="mb-2 block text-sm font-medium"
-                            >
-                                Duration
-                            </label>
-
-                            <input
-                                id="duration_days"
-                                type="number"
-                                min="1"
-                                step="1"
-                                value={data.duration_days}
-                                onChange={(event) =>
-                                    setData(
-                                        'duration_days',
-                                        event.target.value,
-                                    )
-                                }
-                                className="w-full rounded-md border bg-background px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-ring"
-                            />
-
-                            {errors.duration_days && (
-                                <p className="mt-1 text-sm text-destructive">
-                                    {errors.duration_days}
-                                </p>
-                            )}
-                        </div>
-
-                        <div className="rounded-lg border bg-muted/30 p-4">
-                            <p className="text-sm font-medium">
-                                Current status
-                            </p>
-
-                            <p className="mt-1 text-sm text-muted-foreground">
-                                {plan.is_active ? 'Active' : 'Inactive'}
-                            </p>
-                        </div>
-
-                        <div className="flex justify-end gap-3">
-                            <Link
-                                href={membershipPlans.index()}
-                                className="rounded-md border px-4 py-2 text-sm font-medium"
-                            >
-                                Cancel
-                            </Link>
-
-                            <button
-                                type="submit"
-                                disabled={
-                                    processing ||
-                                    !data.name ||
-                                    !data.price ||
-                                    !data.duration_days
-                                }
-                                className="rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground disabled:cursor-not-allowed disabled:opacity-50"
-                            >
-                                {processing
-                                    ? 'Saving...'
-                                    : 'Save Changes'}
-                            </button>
-                        </div>
-                    </form>
-                </section>
+                            <CardFooter className="flex justify-end gap-3 border-t bg-muted/10 px-6 py-4">
+                                <Button variant="outline" asChild>
+                                    <Link href={membershipPlans.index()}>Cancel</Link>
+                                </Button>
+                                <Button
+                                    type="submit"
+                                    disabled={
+                                        processing ||
+                                        !data.name ||
+                                        !data.price ||
+                                        !data.duration_days
+                                    }
+                                >
+                                    {processing && <Spinner data-icon="inline-start" />}
+                                    Save Changes
+                                </Button>
+                            </CardFooter>
+                        </form>
+                    </Card>
+                </div>
             </div>
         </>
     );
@@ -195,8 +171,8 @@ Edit.layout = {
             href: membershipPlans.index(),
         },
         {
-            title: 'Edit',
-            href: membershipPlans.index(),
+            title: 'Edit Plan',
+            href: '#',
         },
     ],
 };
