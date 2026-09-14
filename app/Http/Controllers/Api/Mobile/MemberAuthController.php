@@ -27,7 +27,7 @@ class MemberAuthController extends Controller
             ],
         ]);
 
-        $account = MemberAccount::query()
+        $account = MemberAccount::withoutTenantScope()
             ->with('member')
             ->whereHas('member', function ($query) use ($validated) {
                 $query->where('phone', $validated['phone']);

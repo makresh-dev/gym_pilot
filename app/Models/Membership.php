@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Models\Concerns\BelongsToTenant;
 use Carbon\Carbon;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Concerns\HasUlids;
@@ -12,7 +13,7 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
 
 class Membership extends Model
 {
-    use HasFactory, HasUlids;
+    use HasFactory, HasUlids, BelongsToTenant;
 
     protected $fillable = [
         'organization_id',

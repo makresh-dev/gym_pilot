@@ -50,7 +50,7 @@ class User extends Authenticatable implements PasskeyUser
         ];
     }
 
-    public function organization()
+    public function organization(): \Illuminate\Database\Eloquent\Relations\BelongsTo
     {
         return $this->belongsTo(Organization::class);
     }

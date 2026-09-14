@@ -2,12 +2,14 @@
 
 namespace App\Models;
 
+use App\Models\Concerns\BelongsToTenant;
 use Illuminate\Database\Eloquent\Concerns\HasUlids;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
 class MemberExpectation extends Model
 {
-    use HasUlids;
+    use HasUlids, BelongsToTenant;
 
     protected $fillable = [
         'organization_id',
@@ -17,12 +19,7 @@ class MemberExpectation extends Model
         'end_date',
     ];
 
-    public function organization()
-    {
-        return $this->belongsTo(Organization::class);
-    }
-
-    public function member()
+    public function member(): BelongsTo
     {
         return $this->belongsTo(Member::class);
     }

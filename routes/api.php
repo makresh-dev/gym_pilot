@@ -12,7 +12,7 @@ Route::prefix('mobile')->group(function () {
         [MemberAuthController::class, 'login']
     )->name('mobile.auth.login');
 
-    Route::middleware('auth:member')->group(function () {
+    Route::middleware(['auth:member', 'tenant'])->group(function () {
         Route::get(
             '/auth/me',
             [MemberAuthController::class, 'me']

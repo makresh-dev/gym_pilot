@@ -5,11 +5,15 @@ namespace Tests\Unit;
 use App\Models\Attendance;
 use App\Models\Member;
 use App\Services\Intelligence\AttendanceDeclineDetector;
+use App\Services\Tenancy\TenantContext;
 use Carbon\Carbon;
+use Illuminate\Foundation\Testing\RefreshDatabase;
 use Tests\TestCase;
 
 class AttendanceDeclineDetectorTest extends TestCase
 {
+    use RefreshDatabase;
+
     public function test_it_detects_a_persistent_attendance_decline(): void
     {
         Carbon::setTestNow(
@@ -17,6 +21,7 @@ class AttendanceDeclineDetectorTest extends TestCase
         );
 
         $member = Member::factory()->create();
+        TenantContext::set($member->organization);
 
         $today = Carbon::today()->startOfWeek();
 
@@ -46,10 +51,10 @@ class AttendanceDeclineDetectorTest extends TestCase
         $result = $detector->detect($member);
 
         $this->assertNotNull($result);
-        $this->assertSame('ATTENDANCE_DECLINE', $result['type']);
+        $this->assertSame('attendance_decline', $result['type']);
         $this->assertSame('high', $result['severity']);
-        $this->assertSame(4.25, $result['baseline_average']);
-        $this->assertSame(1.0, $result['recent_average']);
-        $this->assertSame(76.47, $result['decline_percentage']);
+        $this->assertSame(4.25, $result['evidence']['baseline_average']);
+        $this->assertSame(1.0, $result['evidence']['recent_average']);
+        $this->assertSame(76.47, $result['evidence']['decline_percentage']);
     }
 }
